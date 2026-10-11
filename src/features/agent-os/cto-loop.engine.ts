@@ -151,7 +151,9 @@ export function planCtoLoopStep(input: {
     idempotencyKey = buildCtoActionIdempotencyKey([
       "ci-retry",
       String(input.observation.issueNumber),
-      String(input.observation.pullRequest?.number ?? "no-pr"),
+      input.observation.pullRequest?.number
+        ? `pr-${input.observation.pullRequest.number}`
+        : "no-pr",
       input.observation.pullRequest?.headShaFingerprint ?? "no-head",
     ]);
     nextAction = "Chờ CI/orchestrator cập nhật trạng thái";

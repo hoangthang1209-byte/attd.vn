@@ -1,5 +1,18 @@
 import type { CtoAllowedAction } from "@/features/agent-os/cto-action.allowlist";
 import type { CtoObservation } from "@/features/agent-os/cto-loop.types";
+import type { PullRequestVerificationCiStatus } from "@/features/automation/automation-task.types";
+
+export const G3_CI_RETRY_BASELINE_CI_STATUS_KEY = "g3CiRetryBaselineCiStatus";
+
+export function readCiRetryBaselineCiStatus(
+  summary: Record<string, string | number | boolean | null>,
+): PullRequestVerificationCiStatus | null {
+  const raw = summary[G3_CI_RETRY_BASELINE_CI_STATUS_KEY];
+  if (raw === "success" || raw === "failure" || raw === "pending" || raw === "unknown") {
+    return raw;
+  }
+  return null;
+}
 
 function parsePostBuildApprovedKeySegments(pendingIdempotencyKey: string): {
   issueNumber: number;
@@ -67,12 +80,24 @@ function observationMatchesCiRetryKey(
 function observationConfirmsCiRetry(input: {
   pendingIdempotencyKey: string;
   observation: CtoObservation;
+  ciRetryBaselineCiStatus: PullRequestVerificationCiStatus | null;
 }): boolean {
   if (!observationMatchesCiRetryKey(input.pendingIdempotencyKey, input.observation)) {
     return false;
   }
   const ciStatus = input.observation.pullRequest?.verification?.ciStatus ?? null;
-  return ciStatus === "pending" || ciStatus === "success";
+  if (ciStatus === "pending") {
+    return true;
+  }
+  if (ciStatus !== "success") {
+    return false;
+  }
+
+  const baseline = input.ciRetryBaselineCiStatus;
+  if (baseline == null) {
+    return false;
+  }
+  return baseline === "failure" || baseline === "unknown";
 }
 
 /**
@@ -82,6 +107,7 @@ export function observationConfirmsPendingExternalAction(input: {
   action: CtoAllowedAction;
   pendingIdempotencyKey: string;
   observation: CtoObservation;
+  ciRetryBaselineCiStatus?: PullRequestVerificationCiStatus | null;
 }): boolean {
   if (input.action === "POST_BUILD_APPROVED") {
     return observationMatchesPostBuildApprovedStableIdentity(
@@ -94,6 +120,7 @@ export function observationConfirmsPendingExternalAction(input: {
     return observationConfirmsCiRetry({
       pendingIdempotencyKey: input.pendingIdempotencyKey,
       observation: input.observation,
+      ciRetryBaselineCiStatus: input.ciRetryBaselineCiStatus ?? null,
     });
   }
 

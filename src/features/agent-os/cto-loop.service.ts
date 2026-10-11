@@ -18,7 +18,11 @@ import {
   derivePendingActionFromIdempotencyKey,
   isOrphanedPendingActionSlot,
 } from "@/features/agent-os/cto-loop.dedupe";
-import { observationConfirmsPendingExternalAction } from "@/features/agent-os/cto-loop.orphan-attribution";
+import {
+  observationConfirmsPendingExternalAction,
+  readCiRetryBaselineCiStatus,
+  G3_CI_RETRY_BASELINE_CI_STATUS_KEY,
+} from "@/features/agent-os/cto-loop.orphan-attribution";
 import { planCtoLoopStep } from "@/features/agent-os/cto-loop.engine";
 import { evaluateCtoTaskPriority } from "@/features/agent-os/cto-priority";
 import {
@@ -90,6 +94,7 @@ function outputSummaryWithG3(
   const merged = { ...parseOutputSummary(previous), ...patch };
   delete merged.g3PendingActionKey;
   delete merged.g3PendingAction;
+  delete merged[G3_CI_RETRY_BASELINE_CI_STATUS_KEY];
   return merged;
 }
 
@@ -97,6 +102,12 @@ function parsePendingAction(summary: AgentRunSummaryJson): CtoAllowedAction | nu
   const raw = summary.g3PendingAction;
   if (typeof raw !== "string" || !isCtoAllowedAction(raw)) return null;
   return raw;
+}
+
+function ciRetryBaselineForOrphanAttribution(
+  summary: AgentRunSummaryJson,
+): ReturnType<typeof readCiRetryBaselineCiStatus> {
+  return readCiRetryBaselineCiStatus(summary);
 }
 
 function resolveOrphanPendingAction(input: {
@@ -385,6 +396,7 @@ async function tryClaimCtoActionSlot(input: {
   agentRunId: string;
   idempotencyKey: string;
   selectedAction: CtoAllowedAction;
+  ciRetryBaselineCiStatus?: string | null;
 }): Promise<boolean> {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -402,14 +414,19 @@ async function tryClaimCtoActionSlot(input: {
             return false;
           }
 
+          const pendingPatch: AgentRunSummaryJson = {
+            ...summary,
+            g3PendingActionKey: input.idempotencyKey,
+            g3PendingAction: input.selectedAction,
+          };
+          if (input.selectedAction === "REQUEST_CI_RETRY" && input.ciRetryBaselineCiStatus) {
+            pendingPatch[G3_CI_RETRY_BASELINE_CI_STATUS_KEY] = input.ciRetryBaselineCiStatus;
+          }
+
           await tx.agentRun.update({
             where: { id: input.agentRunId },
             data: {
-              outputSummary: {
-                ...summary,
-                g3PendingActionKey: input.idempotencyKey,
-                g3PendingAction: input.selectedAction,
-              } as Prisma.InputJsonValue,
+              outputSummary: pendingPatch as Prisma.InputJsonValue,
             },
           });
           return true;
@@ -734,6 +751,7 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
         action: resolvedOrphanAction,
         pendingIdempotencyKey: pendingActionKey,
         observation: observationBefore,
+        ciRetryBaselineCiStatus: ciRetryBaselineForOrphanAttribution(outputSummary),
       });
       planForPersist =
         plan.selectedAction === resolvedOrphanAction && plan.idempotencyKey === pendingActionKey
@@ -766,6 +784,10 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
       agentRunId: run.id,
       idempotencyKey: plan.idempotencyKey,
       selectedAction: plan.selectedAction,
+      ciRetryBaselineCiStatus:
+        plan.selectedAction === "REQUEST_CI_RETRY"
+          ? (observationBefore.pullRequest?.verification?.ciStatus ?? "unknown")
+          : null,
     });
     if (!actionSlotClaimed) {
       const effectivePendingAction =
@@ -783,6 +805,7 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
           action: plan.selectedAction,
           pendingIdempotencyKey: plan.idempotencyKey,
           observation: observationBefore,
+          ciRetryBaselineCiStatus: ciRetryBaselineForOrphanAttribution(outputSummary),
         });
         planForPersist = plan;
         execution = {

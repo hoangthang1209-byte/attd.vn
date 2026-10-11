@@ -618,6 +618,7 @@ describe("processCtoLoopForTask", () => {
         outputSummary: {
           g3PendingActionKey: pendingKey,
           g3PendingAction: "REQUEST_CI_RETRY",
+          g3CiRetryBaselineCiStatus: "failure",
         },
       },
     });
@@ -642,6 +643,53 @@ describe("processCtoLoopForTask", () => {
     assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
     assert.equal(recovered.plan.selectedAction, "REQUEST_CI_RETRY");
     assert.equal(recovered.plan.idempotencyKey, pendingKey);
+  });
+
+  it("does not recover CI retry orphan when CI was already green without retry baseline", async () => {
+    const issueNumber = TEST_ISSUE_ORPHAN_PENDING + 51;
+    const mergeCommitSha = "fedcba9876543210987654321098765432109876";
+    const headFingerprint = mergeCommitSha.slice(0, 12);
+    const pendingKey = buildCtoActionIdempotencyKey([
+      "ci-retry",
+      String(issueNumber),
+      "pr-12",
+      headFingerprint,
+    ]);
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, { status: "ci_review" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "REQUEST_CI_RETRY",
+        },
+      },
+    });
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "approved", ciStatus: "success" },
+        },
+      }),
+    });
+
+    assert.equal(result.execution.skippedReason, "orphaned_pending_unconfirmed");
+    assert.equal(result.plan.selectedAction, "REQUEST_CI_RETRY");
+    assert.equal(result.plan.idempotencyKey, pendingKey);
   });
 
   it("creates a new CTO attempt after CANCELLED terminal when inbound arrives", async () => {
