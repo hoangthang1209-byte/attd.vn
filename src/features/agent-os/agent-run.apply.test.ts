@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { ingestManualOwnerDecisionEvent } from "@/features/agent-os/agent-event.ingestion";
+import {
+  ingestCiResultEvent,
+  ingestManualOwnerDecisionEvent,
+  ingestVercelDeploymentEvent,
+} from "@/features/agent-os/agent-event.ingestion";
 import {
   applyInboundEventToRunFields,
   initialRunFields,
@@ -16,6 +20,33 @@ describe("applyInboundEventToRunFields", () => {
     });
     assert.equal(next.status, "RUNNING");
     assert.ok(next.startedAt);
+  });
+
+  it("moves queued runs to WAITING_HUMAN on immediate CI blockers", () => {
+    const inbound = ingestCiResultEvent({
+      pullNumber: 187,
+      checkName: "Verify",
+      conclusion: "failure",
+      eventId: "check-run:187:verify:failure",
+    });
+    const next = applyInboundEventToRunFields(initialRunFields(), inbound);
+    assert.equal(next.status, "WAITING_HUMAN");
+    assert.match(next.blockerReason ?? "", /CI Verify/);
+  });
+
+  it("completes WAITING_EXTERNAL on production-ready deployment", () => {
+    const inbound = ingestVercelDeploymentEvent({
+      environment: "production",
+      deploymentState: "ready",
+      commitSha: "abc1234",
+      eventId: "vercel:deployment:ready:abc1234",
+    });
+    const next = applyInboundEventToRunFields(
+      { ...initialRunFields(), status: "WAITING_EXTERNAL", startedAt: new Date("2026-01-01") },
+      inbound,
+    );
+    assert.equal(next.status, "SUCCEEDED");
+    assert.ok(next.finishedAt);
   });
 
   it("records human approval timestamp", () => {
