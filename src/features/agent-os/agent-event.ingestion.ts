@@ -21,6 +21,7 @@ export type GitHubIssueStatusInbound = {
   normalizedStatus: string;
   commentAuthor?: string;
   occurredAt?: string;
+  eventId?: string;
 };
 
 export type GitHubPrInbound = {
@@ -30,6 +31,7 @@ export type GitHubPrInbound = {
   merged: boolean;
   ciStatus?: "success" | "failure" | "pending" | "unknown";
   occurredAt?: string;
+  eventId?: string;
 };
 
 export type CiResultInbound = {
@@ -38,6 +40,7 @@ export type CiResultInbound = {
   checkName: string;
   conclusion: "success" | "failure" | "cancelled" | "skipped" | "unknown";
   occurredAt?: string;
+  eventId?: string;
 };
 
 export type ReviewerResultInbound = {
@@ -45,6 +48,7 @@ export type ReviewerResultInbound = {
   pullNumber: number;
   reviewState: "approved" | "changes_requested" | "commented" | "dismissed" | "unknown";
   occurredAt?: string;
+  eventId?: string;
 };
 
 export type VercelDeploymentInbound = {
@@ -53,6 +57,7 @@ export type VercelDeploymentInbound = {
   deploymentState: "ready" | "error" | "building" | "cancelled" | "unknown";
   commitSha?: string;
   occurredAt?: string;
+  eventId?: string;
 };
 
 export type ManualOwnerDecisionInbound = {
@@ -60,10 +65,19 @@ export type ManualOwnerDecisionInbound = {
   decision: "approve_build" | "block" | "retry" | "cancel" | "other";
   actorLogin?: string;
   occurredAt?: string;
+  eventId?: string;
 };
 
 function buildIdempotencyKey(parts: readonly string[]): string {
   return parts.filter(Boolean).join(":");
+}
+
+function requireEventIdentity(input: { eventId?: string; occurredAt?: string }): string {
+  const identity = input.eventId?.trim() || input.occurredAt?.trim();
+  if (!identity) {
+    throw new Error("Agent event requires eventId or occurredAt for safe idempotency");
+  }
+  return identity;
 }
 
 export function ingestGitHubIssueStatusEvent(input: GitHubIssueStatusInbound): InboundAgentEvent {
@@ -71,7 +85,7 @@ export function ingestGitHubIssueStatusEvent(input: GitHubIssueStatusInbound): I
     "github_issue_status",
     String(input.issueNumber),
     input.normalizedStatus,
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   let suggestedStatus: AgentRunStatus | undefined;
@@ -98,7 +112,7 @@ export function ingestGitHubPrEvent(input: GitHubPrInbound): InboundAgentEvent {
     String(input.pullNumber),
     input.state,
     input.merged ? "merged" : "open",
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   let suggestedStatus: AgentRunStatus | undefined = "RUNNING";
@@ -125,7 +139,7 @@ export function ingestCiResultEvent(input: CiResultInbound): InboundAgentEvent {
     ref,
     input.checkName,
     input.conclusion,
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   const failed = input.conclusion === "failure" || input.conclusion === "cancelled";
@@ -149,7 +163,7 @@ export function ingestReviewerResultEvent(input: ReviewerResultInbound): Inbound
     "reviewer_result",
     String(input.pullNumber),
     input.reviewState,
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   const needsChanges = input.reviewState === "changes_requested";
@@ -172,7 +186,7 @@ export function ingestVercelDeploymentEvent(input: VercelDeploymentInbound): Inb
     input.environment,
     input.deploymentState,
     input.commitSha ?? "",
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   let suggestedStatus: AgentRunStatus | undefined = "WAITING_EXTERNAL";
@@ -199,7 +213,7 @@ export function ingestManualOwnerDecisionEvent(input: ManualOwnerDecisionInbound
     String(input.issueNumber),
     input.decision,
     input.actorLogin ?? "",
-    input.occurredAt ?? "",
+    requireEventIdentity(input),
   ]);
 
   const approvalReceived = input.decision === "approve_build";
