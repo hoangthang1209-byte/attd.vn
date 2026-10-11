@@ -49,6 +49,27 @@ describe("applyInboundEventToRunFields", () => {
     assert.ok(next.finishedAt);
   });
 
+  it("clears stale blocker fields after recovery", () => {
+    const next = applyInboundEventToRunFields(
+      {
+        ...initialRunFields(),
+        status: "WAITING_HUMAN",
+        blockerReason: "CI Verify: failure",
+        nextAction: "Sửa CI và đẩy commit mới",
+        startedAt: new Date("2026-01-01"),
+      },
+      {
+        source: "CI_RESULT",
+        idempotencyKey: "recovery",
+        payloadSummary: { kind: "ci_result" },
+        suggestedStatus: "RUNNING",
+      },
+    );
+    assert.equal(next.status, "RUNNING");
+    assert.equal(next.blockerReason, null);
+    assert.equal(next.nextAction, null);
+  });
+
   it("records human approval timestamp", () => {
     const inbound = ingestManualOwnerDecisionEvent({
       issueNumber: 186,
