@@ -42,10 +42,9 @@ const RULES: Rule[] = [
  */
 export class DeterministicMediaClassifier implements MediaClassifier {
   async classify(input: ClassifierInput): Promise<{ labels: ClassifierLabel[]; confidence: number }> {
-    const haystack = fold(
+    const filenameHaystack = fold([input.filename, input.originalName ?? ""].join(" "));
+    const editorialHaystack = fold(
       [
-        input.filename,
-        input.originalName ?? "",
         input.title ?? "",
         input.altText ?? "",
         input.caption ?? "",
@@ -59,11 +58,31 @@ export class DeterministicMediaClassifier implements MediaClassifier {
         input.roleCode ?? "",
       ].join(" "),
     );
+    const pathHaystack = fold((input.pathHints ?? []).join(" "));
 
     const scores = new Map<ClassifierLabel, number>();
-    for (const rule of RULES) {
-      if (rule.patterns.some((pattern) => pattern.test(haystack))) {
-        scores.set(rule.label, (scores.get(rule.label) ?? 0) + rule.weight);
+    const applyRules = (haystack: string, weightScale: number) => {
+      if (!haystack.trim()) return;
+      for (const rule of RULES) {
+        if (rule.patterns.some((pattern) => pattern.test(haystack))) {
+          scores.set(rule.label, (scores.get(rule.label) ?? 0) + rule.weight * weightScale);
+        }
+      }
+    };
+    // Filename/folder strings are hints — editorial + dimensions win on conflict later.
+    applyRules(filenameHaystack, 0.55);
+    applyRules(pathHaystack, 0.45);
+    applyRules(editorialHaystack, 1);
+
+    const width = input.width ?? null;
+    const height = input.height ?? null;
+    if (width && height && width > 0 && height > 0) {
+      const ratio = width / height;
+      if (ratio >= 2.4) scores.set("lifestyle", (scores.get("lifestyle") ?? 0) + 6);
+      if (ratio <= 0.55) scores.set("closeup", (scores.get("closeup") ?? 0) + 5);
+      if (Math.abs(ratio - 1) < 0.08 && width >= 1200) {
+        scores.set("polo", (scores.get("polo") ?? 0) + 4);
+        scores.set("tshirt", (scores.get("tshirt") ?? 0) + 4);
       }
     }
 

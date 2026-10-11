@@ -207,7 +207,13 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     icon: "⚙️",
     platforms: domainItems([
       {
-        label: "Media",
+        label: "Media Inbox",
+        href: "/admin/media/inbox",
+        status: "active",
+        requiredPermissions: ["canManageProducts"],
+      },
+      {
+        label: "Thư viện Media",
         href: "/admin/media",
         status: "active",
         requiredPermissions: ["canManageProducts"],

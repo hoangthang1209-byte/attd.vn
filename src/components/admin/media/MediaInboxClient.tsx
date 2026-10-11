@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { mediaAdvancedToolsEnabled } from "@/features/media/media-staff-ux";
 import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 import type { PhotographerWorkflowLane } from "@/features/media/intelligence/dashboard.service";
 
@@ -23,6 +25,8 @@ const LANE_HINTS: Record<PhotographerWorkflowLane, string> = {
 };
 
 export default function MediaInboxClient() {
+  const searchParams = useSearchParams();
+  const showAdvancedTools = mediaAdvancedToolsEnabled(searchParams);
   const [lanes, setLanes] = useState<Record<PhotographerWorkflowLane, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,17 +55,20 @@ export default function MediaInboxClient() {
 
   return (
     <>
-      <AdminPageTitle title="Incoming Assets" />
+      <AdminPageTitle title="Media Inbox" />
       <p style={{ marginTop: 0, color: "#6b7280", maxWidth: 640 }}>
-        Photographer upload → hệ thống sinh metadata → editor review. Không auto-publish.
+        Upload hàng loạt / theo thư mục → hệ thống phát hiện trùng, gợi ý tag và tối ưu hiển thị. Tag
+        tin cậy cao tự áp dụng; mục mâu thuẫn chờ review. Không auto-publish.
       </p>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <Link href="/admin/media" className="admin-btn admin-btn--secondary">
-          Thư viện
+        <Link href="/admin/media" className="admin-btn admin-btn--primary">
+          Tải ảnh / Thư viện
         </Link>
-        <Link href="/admin/media/dashboard" className="admin-btn admin-btn--secondary">
-          Dashboard
-        </Link>
+        {showAdvancedTools ? (
+          <Link href="/admin/media/dashboard" className="admin-btn admin-btn--secondary">
+            Dashboard
+          </Link>
+        ) : null}
       </div>
 
       {loading ? <InlineLoading title="Đang tải..." /> : null}

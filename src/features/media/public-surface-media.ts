@@ -87,7 +87,10 @@ function resolveAssetUrl(asset: {
   url?: string | null;
   thumbnailUrl?: string | null;
 }): string | null {
-  return getPublicMediaUrl(asset.url) ?? getPublicMediaUrl(asset.thumbnailUrl);
+  return (
+    getPublicMediaUrl(asset.url, { webDelivery: true }) ??
+    getPublicMediaUrl(asset.thumbnailUrl, { cardDelivery: true })
+  );
 }
 
 /**

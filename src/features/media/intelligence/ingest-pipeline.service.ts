@@ -8,6 +8,17 @@ import {
   type SuggestedMediaMetadata,
 } from "@/features/media/intelligence/intelligence.types";
 import { updateMediaAiProcessingStatus } from "@/features/media/services/media-intelligence.service";
+import {
+  MEDIA_INGEST_AUTO_APPLY_CONFIDENCE,
+  MEDIA_INGEST_REVIEW_ONLY_CONFIDENCE,
+} from "@/features/media/media-ingest-policy";
+import { ingestHintTokensFromRelativePath } from "@/features/media/media-ingest-hints";
+
+const INGEST_META_KEY = "ingest";
+
+export type MediaIngestMetaBag = {
+  relativePath?: string | null;
+};
 
 /**
  * Resumable ingest pipeline:
@@ -46,6 +57,9 @@ export async function runMediaIngestPipeline(mediaAssetId: string): Promise<{
   }
 
   try {
+    const ingestMeta = readIngestMeta(asset.metadata);
+    const pathHints = ingestHintTokensFromRelativePath(ingestMeta?.relativePath);
+
     const suggested = await defaultMetadataProvider.suggest({
       filename: asset.filename,
       originalName: asset.originalName,
@@ -65,7 +79,11 @@ export async function runMediaIngestPipeline(mediaAssetId: string): Promise<{
       orientation: asset.orientation,
       dominantColor: asset.dominantColor,
       mimeType: asset.mimeType,
+      pathHints,
     });
+
+    const autoApplySemantic = suggested.confidence >= MEDIA_INGEST_AUTO_APPLY_CONFIDENCE;
+    const reviewOnly = suggested.confidence < MEDIA_INGEST_REVIEW_ONLY_CONFIDENCE;
 
     const health = calculateAssetHealth({
       altText: asset.altText || suggested.altText,
@@ -113,24 +131,34 @@ export async function runMediaIngestPipeline(mediaAssetId: string): Promise<{
         altText: asset.altText?.trim() ? undefined : suggested.altText,
         caption: asset.caption?.trim() ? undefined : suggested.caption,
         keywords: asset.keywords.length ? undefined : suggested.keywords,
-        subjectTerms: asset.subjectTerms.length
-          ? undefined
-          : suggested.suggestedSubjectTerms,
-        materialTerms: asset.materialTerms.length
-          ? undefined
-          : suggested.suggestedMaterialTerms,
-        techniqueTerms: asset.techniqueTerms.length
-          ? undefined
-          : suggested.suggestedTechniqueTerms,
-        industryTerms: asset.industryTerms.length
-          ? undefined
-          : suggested.suggestedIndustryTerms,
-        useCaseTerms: asset.useCaseTerms.length
-          ? undefined
-          : suggested.suggestedUseCaseTerms,
-        contentSuitabilities: asset.contentSuitabilities.length
-          ? undefined
-          : suggested.suggestedSuitabilities,
+        subjectTerms:
+          asset.subjectTerms.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedSubjectTerms,
+        materialTerms:
+          asset.materialTerms.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedMaterialTerms,
+        techniqueTerms:
+          asset.techniqueTerms.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedTechniqueTerms,
+        industryTerms:
+          asset.industryTerms.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedIndustryTerms,
+        useCaseTerms:
+          asset.useCaseTerms.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedUseCaseTerms,
+        contentSuitabilities:
+          asset.contentSuitabilities.length || !autoApplySemantic
+            ? undefined
+            : suggested.suggestedSuitabilities,
+        tags:
+          asset.tags.length || !autoApplySemantic || reviewOnly
+            ? undefined
+            : suggested.classifierLabels.filter((label) => label !== "unknown").slice(0, 8),
         // Do not change visibility.
       },
     });
@@ -149,6 +177,15 @@ export async function runMediaIngestPipeline(mediaAssetId: string): Promise<{
     });
     throw error;
   }
+}
+
+export function readIngestMeta(
+  metadata: Prisma.JsonValue | null | undefined,
+): MediaIngestMetaBag | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const bag = (metadata as Record<string, unknown>)[INGEST_META_KEY];
+  if (!bag || typeof bag !== "object") return null;
+  return bag as MediaIngestMetaBag;
 }
 
 export function readIntelligentBag(

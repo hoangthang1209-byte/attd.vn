@@ -343,9 +343,13 @@ export async function POST(request: Request) {
     const assetType =
       typeof assetTypeRaw === "string" ? validateMediaAssetType(assetTypeRaw) ?? undefined : undefined;
 
+    const ingestRelativePath = formData.get("ingestRelativePath");
+
     const { asset, warning, duplicateOfId, reused } = await uploadMediaAsset({
       folder: folderKey,
       file: fileEntry as File,
+      ingestRelativePath:
+        typeof ingestRelativePath === "string" ? ingestRelativePath : undefined,
       altText: typeof altText === "string" ? altText : undefined,
       title: typeof title === "string" ? title : undefined,
       caption: typeof caption === "string" ? caption : undefined,

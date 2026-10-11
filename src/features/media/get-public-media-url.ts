@@ -1,4 +1,8 @@
 import { isPublishableLocalImagePath, isValidImageSrc } from "@/lib/imagePaths";
+import {
+  getCardDeliveryMediaUrl,
+  getWebDeliveryMediaUrl,
+} from "@/features/media/cloudinary-delivery-url";
 
 /**
  * Canonical public media URL resolution for product PDP/cards and media pickers.
@@ -21,6 +25,26 @@ export type PublicMediaAssetLike = {
 };
 
 export type PublicMediaUrlInput = string | null | undefined | PublicMediaAssetLike;
+
+export type PublicMediaUrlOptions = {
+  /** Apply Cloudinary web-optimized transforms for public pages (original URL stays in DB). */
+  webDelivery?: boolean;
+  /** Smaller card/grid delivery profile. */
+  cardDelivery?: boolean;
+};
+
+function applyPublicDeliveryProfile(
+  url: string,
+  options?: PublicMediaUrlOptions,
+): string {
+  if (options?.cardDelivery) {
+    return getCardDeliveryMediaUrl(url) ?? url;
+  }
+  if (options?.webDelivery) {
+    return getWebDeliveryMediaUrl(url) ?? url;
+  }
+  return url;
+}
 
 function isBlockedPublicPath(pathname: string): boolean {
   const lower = pathname.toLowerCase();
@@ -92,16 +116,20 @@ function candidatesFromAsset(asset: PublicMediaAssetLike): string[] {
  * Resolve a public media URL from a raw string or MediaAsset-like record.
  * Returns null when no safe public URL is available (caller should use placeholder).
  */
-export function getPublicMediaUrl(assetOrUrl: PublicMediaUrlInput): string | null {
+export function getPublicMediaUrl(
+  assetOrUrl: PublicMediaUrlInput,
+  options?: PublicMediaUrlOptions,
+): string | null {
   if (assetOrUrl == null) return null;
 
   if (typeof assetOrUrl === "string") {
-    return normalizePublicMediaUrlCandidate(assetOrUrl);
+    const resolved = normalizePublicMediaUrlCandidate(assetOrUrl);
+    return resolved ? applyPublicDeliveryProfile(resolved, options) : null;
   }
 
   for (const candidate of candidatesFromAsset(assetOrUrl)) {
     const resolved = normalizePublicMediaUrlCandidate(candidate);
-    if (resolved) return resolved;
+    if (resolved) return applyPublicDeliveryProfile(resolved, options);
   }
   return null;
 }
