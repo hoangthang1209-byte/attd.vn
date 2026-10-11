@@ -69,7 +69,10 @@ export default function ProductCard({
   const stockColor = stockStatus ? (STOCK_COLORS[stockStatus] ?? "#6b7280") : undefined;
   const moqLabel = isPublicMoq(moq) ? formatProductCardMoq(moq) : null;
   const showCategory = Boolean(category?.trim());
-  const showB2bMeta = Boolean(moqLabel || leadTime);
+  const displayLeadTime = stockStatus === "OUT_OF_STOCK" && /có sẵn/i.test(leadTime ?? "")
+    ? "Liên hệ để xác nhận thời gian"
+    : leadTime;
+  const showB2bMeta = Boolean(moqLabel || displayLeadTime);
   const capabilityLabels = [
     supportsPrinting ? "In logo" : null,
     supportsEmbroidery ? "Thêu" : null,
@@ -130,8 +133,8 @@ export default function ProductCard({
           {showB2bMeta && (
             <div className="product-card-b2b">
               {moqLabel && <span className="product-card-meta">{moqLabel}</span>}
-              {leadTime && (
-                <span className="product-card-meta product-card-leadtime">{leadTime}</span>
+              {displayLeadTime && (
+                <span className="product-card-meta product-card-leadtime">{displayLeadTime}</span>
               )}
             </div>
           )}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, Search, X } from "lucide-react";
 import AttdLogo from "@/components/public/AttdLogo";
 import TrackedLink from "@/components/analytics/TrackedLink";
@@ -30,13 +30,50 @@ export default function PublicHeaderV7({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const syncHeight = () => document.documentElement.style.setProperty(
+      "--mp-header-stack-height", `${header.querySelector(".v7-header__inner")?.getBoundingClientRect().height ?? 76}px`,
+    );
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--mp-header-stack-height");
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    const closeOnResize = () => { if (window.innerWidth > 900) setOpen(false); };
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeOnResize);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeOnResize);
+    };
+  }, [open]);
   const solutionActive = SOLUTIONS.some((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
-  const productActive = pathname === "/san-pham" || categoryTree.some((group) =>
+  const productActive = pathname === "/san-pham" || pathname.startsWith("/san-pham/") || categoryTree.some((group) =>
     pathname === group.viewAllHref || group.children.some((child) => pathname === child.href),
   );
 
   return (
-    <header className="v7-header">
+    <header ref={headerRef} className="v7-header">
       <div className="container v7-header__inner">
         <AttdLogo src={logoUrl} className="v7-header__logo" />
 
@@ -119,7 +156,9 @@ export default function PublicHeaderV7({
 
         <button
           type="button"
+          ref={menuButtonRef}
           className="v7-header__menu-button"
+          aria-controls="v7-mobile-navigation"
           aria-label={open ? "Đóng menu" : "Mở menu"}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
@@ -129,7 +168,7 @@ export default function PublicHeaderV7({
       </div>
 
       {open ? (
-        <div className="v7-mobile-nav">
+        <div id="v7-mobile-navigation" className="v7-mobile-nav">
           <nav className="container" aria-label="Điều hướng mobile">
             <span className="v7-mobile-nav__label">Giải pháp</span>
             {SOLUTIONS.map((item) => (

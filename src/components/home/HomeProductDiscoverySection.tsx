@@ -23,11 +23,11 @@ export default function HomeProductDiscoverySection({ products }: Props) {
         <div className="home-product-showcase__heading">
           <div>
             <p className="public-eyebrow">Sản phẩm nổi bật</p>
-            <h2>Nguồn hàng đang được hỏi nhiều</h2>
+            <h2>Khám phá sản phẩm của ATTD</h2>
           </div>
           <div className="home-product-showcase__heading-side">
             <p>
-              Đi thẳng vào sản phẩm để xem màu, MOQ, thời gian và khả năng hoàn thiện.
+              Xem màu sắc, số lượng tối thiểu và các lựa chọn in, thêu hoặc làm theo yêu cầu.
             </p>
             <Link href="/san-pham" className="home-product-showcase__all">
               Xem toàn bộ sản phẩm →
@@ -36,7 +36,7 @@ export default function HomeProductDiscoverySection({ products }: Props) {
         </div>
 
         <div className="home-product-showcase__grid">
-          {products.map((product) => {
+          {products.slice(0, 6).map((product) => {
             const stockLabel = product.availabilityLabel ?? undefined;
             const stockStatus = stockLabel
               ? AVAILABILITY_STATUS[stockLabel]

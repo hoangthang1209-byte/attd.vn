@@ -26,8 +26,8 @@ export default async function UniformPage() {
       ]}
       outcomes={[
         "Mẫu và màu được duyệt trước sản xuất",
-        "Size set và bảng phân bổ rõ ràng",
-        "Logo/branding nhất quán trên toàn batch",
+        "Bộ mẫu size và bảng phân bổ rõ ràng",
+        "Logo và nhận diện thống nhất trong toàn bộ đơn hàng",
         "Đóng gói và bàn giao theo đơn vị/phòng ban nếu cần",
       ]}
       process={[

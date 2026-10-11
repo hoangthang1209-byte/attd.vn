@@ -1,0 +1,51 @@
+name: Public Mobile QA
+on:
+  push:
+    branches: [fix/public-browser-audit-oct03, main]
+    paths: [scripts/public-mobile-qa.mjs, .github/workflows/public-mobile-qa.yml, package.json, package-lock.json, 'src/**']
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Exact deployment URL to verify (preview or production)
+        required: true
+        type: string
+permissions:
+  contents: read
+  statuses: read
+concurrency:
+  group: public-mobile-qa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Wait for updated preview UI
+        if: github.event_name == 'push'
+        run: |
+          for attempt in $(seq 1 80); do
+            if curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if any(x["context"] == "Vercel" and x["state"] == "success" for x in s["statuses"]) else 1)'; then exit 0; fi
+            sleep 15
+          done
+          echo 'Updated preview UI is not ready'; exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Run authenticated mobile QA
+        run: npm run qa:public:mobile
+        env:
+          QA_PREVIEW_SHARE_URL: ${{ github.ref != 'refs/heads/main' && secrets.QA_PREVIEW_SHARE_URL || '' }}
+          QA_BASE_URL: ${{ inputs.base_url || (github.ref == 'refs/heads/main' && 'https://www.attd.vn') || 'https://attd-vn-git-fix-public-bro-9096a0-hoangthang1209-3040s-projects.vercel.app' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-mobile-393x852-${{ github.sha }}
+          path: test-results/public-mobile
+          retention-days: 14
+          overwrite: true

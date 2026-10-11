@@ -4,7 +4,7 @@ import { getPublicSurfaceMedia } from "@/features/media/public-surface-media";
 
 export const revalidate = 3600;
 export const metadata: Metadata = {
-  title: "Artist & Event Merchandise Partner | ATTD",
+  title: "Merchandise nghệ sĩ & sự kiện | ATTD",
   description: "Đối tác phát triển và sản xuất merchandise cho nghệ sĩ, concert, entertainment agency và event: multi-SKU, sample, production, QC, packing và delivery.",
 };
 
@@ -12,7 +12,7 @@ export default async function MerchandisePage() {
   const media = await getPublicSurfaceMedia("merchandise");
   return (
     <BusinessSolutionPageV7
-      kicker="Artist & Event Merchandise"
+      kicker="Merchandise nghệ sĩ & sự kiện"
       title="Sản xuất merchandise cho nghệ sĩ và sự kiện, theo sát từ mẫu đến ngày giao."
       lead="ATTD phối hợp cùng agency, đơn vị tổ chức và đội ngũ thương hiệu để phát triển, sản xuất và hoàn thiện merchandise nhiều mẫu cho concert, fan event và các chiến dịch quy mô lớn."
       audience="Agency giải trí · Đơn vị tổ chức · Đội ngũ nghệ sĩ · Thương hiệu"

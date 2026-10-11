@@ -39,7 +39,7 @@ export default function BusinessSolutionPageV7({
   return (
     <main className="v7-solution-page">
       <section className="v7-solution-hero">
-        <div className="container v7-solution-hero__grid">
+        <div className={`container v7-solution-hero__grid${media ? "" : " v7-solution-hero__grid--no-media"}`}>
           <div className="v7-solution-hero__copy">
             <p className="v7-kicker">{kicker}</p>
             <h1>{title}</h1>

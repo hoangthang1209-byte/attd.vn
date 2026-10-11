@@ -265,7 +265,7 @@ export default async function CategoryPage({ params }: PageProps) {
             <p className="v7-kicker">Danh mục nguồn hàng B2B</p>
             <h1>{cat.name}</h1>
             <p>
-              {content?.shortIntro ??
+              {cat.products.length === 0 ? `Liên hệ ATTD để chọn mẫu ${cat.name.toLowerCase()}, chất liệu và phương án hoàn thiện phù hợp với nhu cầu của bạn.` : content?.shortIntro ??
                 cat.description ??
                 `Nguồn hàng ${cat.name.toLowerCase()} dành cho đại lý, xưởng in và doanh nghiệp.`}
             </p>
@@ -299,9 +299,9 @@ export default async function CategoryPage({ params }: PageProps) {
         ) : null}
 
         <div className="container v7-collection-hero__meta">
-          <div><span>Sản phẩm</span><strong>{cat.products.length} lựa chọn</strong></div>
+          <div><span>Sản phẩm</span><strong>{cat.products.length ? `${cat.products.length}${cat.hasMoreProducts ? "+" : ""} lựa chọn` : "Liên hệ tư vấn mẫu"}</strong></div>
           <div><span>Hoàn thiện</span><strong>Tùy theo từng sản phẩm và cấu hình</strong></div>
-          <div><span>Báo giá</span><strong>Theo MOQ · cấu hình · deadline</strong></div>
+          <div><span>Báo giá</span><strong>Theo số lượng · yêu cầu · thời gian</strong></div>
         </div>
       </section>
 
@@ -321,7 +321,7 @@ export default async function CategoryPage({ params }: PageProps) {
               <p className="v7-kicker">Nguồn hàng trong danh mục</p>
               <h2>
                 {cat.products.length > 0
-                  ? `${cat.products.length} sản phẩm ${cat.name}`
+                  ? `${cat.products.length}${cat.hasMoreProducts ? "+" : ""} sản phẩm ${cat.name}`
                   : `Nguồn hàng ${cat.name}`}
               </h2>
             </div>

@@ -41,7 +41,7 @@ export default async function SourcingPage() {
         capabilities={[
           { title: "Danh mục nguồn hàng", description: "Áo thun, polo, nón, tote, quà tặng và các nhóm sản phẩm có thể mở rộng theo nhu cầu." },
           { title: "Tồn kho & số lượng", description: "Tư vấn phương án phù hợp giữa hàng có sẵn, đặt theo đợt và sản xuất bổ sung." },
-          { title: "Hoàn thiện thương hiệu", description: "In, thêu, nhãn, packaging và các công đoạn hoàn thiện trước khi giao." },
+          { title: "Hoàn thiện thương hiệu", description: "In, thêu, nhãn, bao bì và các công đoạn hoàn thiện trước khi giao." },
           { title: "Hỗ trợ báo giá", description: "Cung cấp hình ảnh, thông tin sản phẩm và tư vấn lựa chọn để đại lý/agency báo giá nhanh hơn." },
         ]}
         outcomes={[
@@ -51,7 +51,7 @@ export default async function SourcingPage() {
           "Có thể chuyển sang làm OEM khi dự án cần sản phẩm riêng",
         ]}
         process={[
-          { title: "Gửi nhu cầu", description: "Nhóm sản phẩm, số lượng, ngân sách và deadline." },
+          { title: "Gửi nhu cầu", description: "Nhóm sản phẩm, số lượng, ngân sách và thời gian cần hàng." },
           { title: "ATTD đề xuất nguồn hàng", description: "So sánh các lựa chọn hàng có sẵn, đặt theo đợt hoặc làm riêng." },
           { title: "Chốt cấu hình", description: "Sản phẩm, màu, size, logo và cách hoàn thiện." },
           { title: "Báo giá & triển khai", description: "Chốt giá, tiến độ và kế hoạch giao hàng." },
