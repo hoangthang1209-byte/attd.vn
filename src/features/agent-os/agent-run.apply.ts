@@ -54,6 +54,14 @@ export function applyInboundEventToRunFields(
     }
   }
 
+  const recovered = next.status === "RUNNING" || next.status === "SUCCEEDED";
+  if (recovered && inbound.blockerReason === undefined) {
+    next.blockerReason = null;
+  }
+  if (recovered && inbound.nextAction === undefined) {
+    next.nextAction = null;
+  }
+
   if (inbound.blockerReason !== undefined) {
     next.blockerReason = inbound.blockerReason;
   }
