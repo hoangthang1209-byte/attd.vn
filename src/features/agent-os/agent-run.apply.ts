@@ -16,7 +16,7 @@ export type AgentRunMutableFields = {
   finishedAt: Date | null;
 };
 
-export function initialRunFields(startedAt: Date = new Date()): AgentRunMutableFields {
+export function initialRunFields(): AgentRunMutableFields {
   return {
     status: "QUEUED",
     blockerReason: null,
