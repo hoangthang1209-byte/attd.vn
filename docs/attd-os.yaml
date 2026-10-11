@@ -1,0 +1,147 @@
+version: 1
+name: ATTD Business Operating System
+repository: hoangthang1209-byte/attd.vn
+production_url: https://attd.vn
+control_plane:
+  route: /admin/automation
+  github_issue: 89
+  operating_agent_issue: 177
+
+operating_agent:
+  role: top_level_governor
+  priority_policy:
+    - revenue_blocked_now
+    - customer_delivery_risk
+    - lead_quote_order_conversion
+    - reliability_security_data_integrity
+    - high_leverage_automation
+    - productivity_ux
+    - architecture_cleanup
+  completion_requires_verification: true
+  memory_is_authority: false
+
+sources_of_truth:
+  business:
+    authority:
+      - docs/authority
+      - docs/decisions
+  architecture:
+    authority:
+      - docs/authority
+      - docs/engineering
+      - docs/decisions
+  operating_config:
+    authority:
+      - docs/attd-os.yaml
+  customer_and_leads:
+    authority:
+      - production_database
+      - crm_domain_services
+  product:
+    authority:
+      - product_platform
+  pricing:
+    authority:
+      - pricing_engine
+  quotation:
+    authority:
+      - quotation_domain
+    consumes:
+      - crm
+      - product_platform
+      - pricing_engine
+  orders:
+    authority:
+      - order_domain
+    consumes:
+      - crm
+      - product_platform
+      - quotation
+  production:
+    authority:
+      - production_domain
+      - production_database
+  software_tasks:
+    authority:
+      - github_issues
+      - github_pull_requests
+  ci:
+    authority:
+      - github_checks
+      - github_actions
+  deployment:
+    authority:
+      - vercel_production_metadata
+  production_verification:
+    authority:
+      - production_runtime
+      - smoke_qa_evidence
+
+lanes:
+  - id: cto
+    role: governance
+  - id: crm
+    role: customer_and_lead_operations
+  - id: pricing
+    role: pricing_engine
+  - id: quotation
+    role: quotation_and_quick_quote
+  - id: orders
+    role: order_management
+  - id: production
+    role: fulfillment
+  - id: materials
+    role: materials_and_suppliers
+  - id: documents
+    role: business_documents
+  - id: public_web
+    role: public_website_conversion
+  - id: seo
+    role: organic_acquisition
+  - id: automation
+    role: engineering_control_plane
+  - id: mobile_ux
+    role: operational_mobile_experience
+
+delivery_gates:
+  default:
+    - lint
+    - typecheck
+    - security_public_token
+    - tests
+    - build
+    - ci
+    - reviewer
+    - production_deployment
+    - smoke_qa
+  high_risk_requires_human_approval:
+    - pricing_policy
+    - payment
+    - banking
+    - auth
+    - permissions
+    - destructive_migration
+    - irreversible_data_rewrite
+
+business_flow:
+  - lead_intake
+  - crm
+  - pricing
+  - quotation
+  - order
+  - production
+  - delivery
+  - documents_and_payment
+  - retention
+
+software_flow:
+  - operating_agent
+  - github_issue
+  - builder
+  - pull_request
+  - ci
+  - reviewer
+  - merge
+  - vercel_production
+  - qa
+  - control_plane_update

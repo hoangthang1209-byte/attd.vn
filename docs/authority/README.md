@@ -21,3 +21,7 @@ CMS/Admin UI standards are defined in [docs/cms-design-system](../cms-design-sys
 - [CTO Principles](./cto-principles.md)
 - [Sprint Rules](./sprint-rules.md)
 - [Definition of Done](./definition-of-done.md)
+- [Single Source of Truth](./single-source-of-truth.md)
+- [ATTD Operating Agent](./operating-agent.md)
+
+Machine-readable operating configuration: [docs/attd-os.yaml](../attd-os.yaml)
