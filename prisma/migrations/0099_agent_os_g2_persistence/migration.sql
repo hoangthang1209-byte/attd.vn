@@ -107,7 +107,7 @@ CREATE INDEX "TaskRun_agentRunId_idx" ON "TaskRun"("agentRunId");
 CREATE INDEX "TaskRun_githubIssueNumber_idx" ON "TaskRun"("githubIssueNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AgentEvent_idempotencyKey_key" ON "AgentEvent"("idempotencyKey");
+CREATE UNIQUE INDEX "AgentEvent_agentRunId_idempotencyKey_key" ON "AgentEvent"("agentRunId", "idempotencyKey");
 
 -- CreateIndex
 CREATE INDEX "AgentEvent_agentRunId_appliedAt_idx" ON "AgentEvent"("agentRunId", "appliedAt");
