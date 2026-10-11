@@ -209,10 +209,10 @@ export async function applyInboundAgentEvent(input: {
 
   const nextFields = applyInboundEventToRunFields(runToMutableFields(run), input.inbound);
 
-  let event;
+  let event: { id: string };
   try {
     event = await prisma.$transaction(async (tx) => {
-    const created = await tx.agentEvent.create({
+      const created = await tx.agentEvent.create({
       data: {
         agentRunId: run.id,
         taskRunId: input.taskRunId ?? null,
@@ -220,15 +220,15 @@ export async function applyInboundAgentEvent(input: {
         idempotencyKey: input.inbound.idempotencyKey,
         payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
       },
-    });
+      });
 
-    await tx.agentRun.update({
+      await tx.agentRun.update({
       where: { id: run.id },
       data: fieldsToUpdateData(nextFields),
     });
 
-    if (input.taskRunId) {
-      await tx.taskRun.update({
+      if (input.taskRunId) {
+        await tx.taskRun.update({
         where: { id: input.taskRunId },
         data: {
           status: nextFields.status,
@@ -237,8 +237,8 @@ export async function applyInboundAgentEvent(input: {
           startedAt: nextFields.startedAt,
           finishedAt: nextFields.finishedAt,
         },
-      });
-    }
+        });
+      }
 
       return created;
     });
