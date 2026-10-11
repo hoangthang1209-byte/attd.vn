@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AgentRunHistoryResponse, AgentRunListItem } from "@/features/agent-os/agent-run.types";
+import type { CtoLoopVisibility } from "@/features/agent-os/cto-loop.types";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
 const AGENT_RUN_STATUS_LABELS: Record<AgentRunListItem["status"], string> = {
@@ -23,6 +24,7 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
   const [result, setResult] = useState<{
     issueNumber: number;
     data: AgentRunHistoryResponse | null;
+    ctoLoop: CtoLoopVisibility | null;
     error: string | null;
   } | null>(null);
 
@@ -31,12 +33,24 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
 
     let cancelled = false;
 
-    void fetch(`/api/admin/automation/agent-runs?issueNumber=${issueNumber}&limit=10`)
-      .then(async (response) => {
+    void Promise.all([
+      fetch(`/api/admin/automation/agent-runs?issueNumber=${issueNumber}&limit=10`).then(async (response) => {
         const json = (await response.json()) as AgentRunHistoryResponse & { message?: string };
         if (!response.ok) throw new Error(json.message ?? "Không thể tải agent run");
+        return json;
+      }),
+      fetch(`/api/admin/automation/cto-loop?issueNumber=${issueNumber}`).then(async (response) => {
+        const json = (await response.json()) as {
+          visibility: CtoLoopVisibility | null;
+          message?: string;
+        };
+        if (!response.ok) throw new Error(json.message ?? "Không thể tải CTO loop");
+        return json.visibility;
+      }),
+    ])
+      .then(([runs, ctoLoop]) => {
         if (!cancelled) {
-          setResult({ issueNumber, data: json, error: null });
+          setResult({ issueNumber, data: runs, ctoLoop, error: null });
         }
       })
       .catch((err: unknown) => {
@@ -44,6 +58,7 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
           setResult({
             issueNumber,
             data: null,
+            ctoLoop: null,
             error: err instanceof Error ? err.message : "Lỗi tải agent run",
           });
         }
@@ -58,6 +73,7 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
 
   const currentResult = result?.issueNumber === issueNumber ? result : null;
   const data = currentResult?.data ?? null;
+  const ctoLoop = currentResult?.ctoLoop ?? null;
   const error = currentResult?.error ?? null;
   const loading = currentResult === null;
 
@@ -68,6 +84,29 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
       {error ? <p className="admin-error">{error}</p> : null}
       {!loading && !error && data && data.runs.length === 0 ? (
         <p className="admin-muted">Chưa có bản ghi AgentRun cho issue này trong cơ sở dữ liệu.</p>
+      ) : null}
+      {!loading && !error && ctoLoop ? (
+        <div className="automation-agent-run-panel__g3">
+          <h4 className="admin-subsection-title">CTO loop (G3)</h4>
+          <p className="admin-muted">
+            Agent gán: {ctoLoop.assignedAgentId ?? "—"} · Hành động: {ctoLoop.selectedAction ?? "—"} ·
+            Ưu tiên: {ctoLoop.priorityTier ?? "—"}
+            {ctoLoop.priorityReason ? ` (${ctoLoop.priorityReason})` : ""}
+          </p>
+          <p className="admin-muted">
+            Xác minh gần nhất: {ctoLoop.lastVerifiedResult ?? "—"} · Trạng thái run:{" "}
+            {ctoLoop.runStatus ?? "—"}
+            {ctoLoop.attemptNumber != null ? ` · Lần thử #${ctoLoop.attemptNumber}` : ""}
+            {ctoLoop.correlationId ? ` · Correlation: ${ctoLoop.correlationId}` : ""}
+          </p>
+          {ctoLoop.blockerReason ? (
+            <p className="admin-error">Blocker: {ctoLoop.blockerReason}</p>
+          ) : null}
+          {ctoLoop.nextAction ? <p>Tiếp theo: {ctoLoop.nextAction}</p> : null}
+          {ctoLoop.humanApprovalRequired ? (
+            <p>{ctoLoop.humanApprovalReceivedAt ? "Đã duyệt con người" : "Cần duyệt con người"}</p>
+          ) : null}
+        </div>
       ) : null}
       {!loading && !error && data?.currentRun ? (
         <p>
