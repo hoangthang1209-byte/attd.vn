@@ -27,6 +27,7 @@ describe("agent event ingestion", () => {
       pullNumber: 200,
       checkName: "build",
       conclusion: "failure",
+      eventId: "check-run:200:build:1",
     });
     assert.equal(event.suggestedStatus, "WAITING_HUMAN");
     assert.match(event.blockerReason ?? "", /CI build/);
@@ -37,8 +38,21 @@ describe("agent event ingestion", () => {
       issueNumber: 1,
       decision: "approve_build",
       actorLogin: "owner",
+      eventId: "owner-decision:1",
     });
     assert.equal(event.payloadSummary.kind, "manual_owner");
     assert.ok(!JSON.stringify(event.payloadSummary).includes("token"));
   });
+  it("rejects events without a stable identity", () => {
+    assert.throws(
+      () =>
+        ingestCiResultEvent({
+          pullNumber: 201,
+          checkName: "build",
+          conclusion: "success",
+        }),
+      /requires eventId or occurredAt/,
+    );
+  });
+
 });
