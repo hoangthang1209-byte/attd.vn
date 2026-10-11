@@ -49,6 +49,41 @@ describe("agent run persistence", () => {
     assert.equal(updated.status, "RUNNING");
   });
 
+  it("applies the same inbound event independently to a retry attempt", async () => {
+    const firstRun = await createAgentRun({
+      agentId: "QA_AGENT",
+      triggerSource: "GITHUB_ISSUE_STATUS",
+      githubIssueNumber: TEST_ISSUE,
+      idempotencyKey: `test-run:${TEST_ISSUE}:same-event:first`,
+    });
+
+    const inbound = ingestGitHubIssueStatusEvent({
+      issueNumber: TEST_ISSUE,
+      normalizedStatus: "building",
+      eventId: "github:issue:building:shared",
+    });
+
+    const firstApply = await applyInboundAgentEvent({ agentRunId: firstRun.id, inbound });
+    assert.equal(firstApply.duplicate, false);
+
+    await prisma.agentRun.update({
+      where: { id: firstRun.id },
+      data: { status: "FAILED", finishedAt: new Date() },
+    });
+
+    const retry = await retryAgentRun({
+      failedRunId: firstRun.id,
+      triggerSource: "MANUAL_OWNER",
+      idempotencyKey: `test-run:${TEST_ISSUE}:same-event:retry`,
+    });
+
+    const retryApply = await applyInboundAgentEvent({ agentRunId: retry.id, inbound });
+    assert.equal(retryApply.duplicate, false);
+
+    const retryUpdated = await prisma.agentRun.findUniqueOrThrow({ where: { id: retry.id } });
+    assert.equal(retryUpdated.status, "RUNNING");
+  });
+
   it("retry creates a new attempt linked to parent", async () => {
     const failed = await createAgentRun({
       agentId: "QA_AGENT",
