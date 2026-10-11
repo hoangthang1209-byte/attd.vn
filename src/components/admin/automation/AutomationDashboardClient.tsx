@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AutomationAgentRunPanel from "@/components/admin/automation/AutomationAgentRunPanel";
 import AutomationLaneBoard from "@/components/admin/automation/AutomationLaneBoard";
 import {
   AdminLoadingState,
@@ -709,9 +710,11 @@ function ProductionStatusBadge({ task }: { task: AutomationTask }) {
 function AutomationTaskDetails({
   task,
   productionCommitSha,
+  showAgentRuns,
 }: {
   task: AutomationTask;
   productionCommitSha: string | null;
+  showAgentRuns: boolean;
 }) {
   return (
     <div className="admin-panel automation-task-card__details">
@@ -799,6 +802,7 @@ function AutomationTaskDetails({
           </ul>
         </div>
       ) : null}
+      <AutomationAgentRunPanel issueNumber={task.issueNumber} active={showAgentRuns} />
     </div>
   );
 }
@@ -849,7 +853,11 @@ function AutomationTaskCard({
         {expanded ? "Thu gọn" : "Chi tiết"}
       </button>
       {expanded ? (
-        <AutomationTaskDetails task={task} productionCommitSha={productionCommitSha} />
+        <AutomationTaskDetails
+          task={task}
+          productionCommitSha={productionCommitSha}
+          showAgentRuns={expanded}
+        />
       ) : null}
     </article>
   );
@@ -937,7 +945,11 @@ function AutomationTaskRow({
       {expanded ? (
         <tr>
           <td colSpan={12}>
-            <AutomationTaskDetails task={task} productionCommitSha={productionCommitSha} />
+            <AutomationTaskDetails
+              task={task}
+              productionCommitSha={productionCommitSha}
+              showAgentRuns={expanded}
+            />
           </td>
         </tr>
       ) : null}

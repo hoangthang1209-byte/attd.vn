@@ -48,6 +48,7 @@ Do **not** grant Contents write, Pull requests write, Actions/workflows write, A
 - Route is protected by existing admin authentication middleware.
 - **Page guard:** `/admin/automation` calls `requireAdminPermissionPage("dashboard.view", "/admin/dashboard")` so direct navigation matches nav and API authorization. Authenticated admins without `dashboard.view` are redirected to the dashboard with a forbidden message; unauthenticated access is handled by existing admin middleware.
 - **API guard:** `/api/admin/automation` requires the `dashboard.view` permission via `requireAutomationDashboardPermission()`, matching the nav entry’s `canViewDashboard` intent (401 unauthenticated, 403 without permission).
+- **Agent run history (G2):** `GET /api/admin/automation/agent-runs?issueNumber={n}` uses the same permission guard and returns read-only `AgentRun` history from PostgreSQL (`docs/agent-os.md`).
 - Read token is used only in server modules (`server-only`) and the `/api/admin/automation` GET route.
 - Write token is used only in server modules and `POST /api/admin/automation/issues/[issueNumber]/approve-build`.
 - API responses never include either token or other secrets.

@@ -103,8 +103,36 @@ Authorization, GitHub read tokens, and caching behavior are unchanged. No client
 - No Prisma schema changes or production database writes from Agent OS code paths.
 - Does not modify pricing, payment, banking, auth, or permission **business logic**.
 
+## Phase G2 — persistent execution state
+
+G2 adds **additive Prisma models** and server services for durable agent execution history. GitHub remains the engineering source of truth; the database stores run state, events, and decisions (summaries only — no secrets).
+
+### Models
+
+- `AgentRun` — top-level execution attempt with status, blocker, next action, human approval markers, correlation/parent retry chain, idempotency key.
+- `TaskRun` — optional sub-run scoped to an `AgentRun` (issue linkage, task area).
+- `AgentEvent` — idempotent inbound events (`AgentEventSource` enum).
+- `AgentDecision` — structured decision log with risk level and evidence references.
+
+### State machine
+
+Typed statuses: `QUEUED → RUNNING → WAITING_EXTERNAL | WAITING_HUMAN → SUCCEEDED | FAILED | CANCELLED`.
+
+Implementation: `src/features/agent-os/agent-run.state-machine.ts` (terminal-state protection, deterministic transitions). Retries create a **new** `AgentRun` row with incremented `attemptNumber` and `parentRunId` — history is never overwritten.
+
+### Event ingestion boundary
+
+Pure normalizers in `src/features/agent-os/agent-event.ingestion.ts` for GitHub issue status, PR, CI, reviewer, Vercel deployment, and manual owner decisions. G3 will wire these to live webhooks/pollers; G2 exposes `applyInboundAgentEvent` in `agent-run.service.ts`.
+
+### Admin visibility
+
+`/admin/automation` task details include **Agent OS — lịch sử chạy (G2)** via `GET /api/admin/automation/agent-runs?issueNumber=…` (same `dashboard.view` permission as the dashboard).
+
+### Migration safety
+
+Migration `0099_agent_os_g2_persistence` is additive only (new enums/tables). Rollback: drop the four tables and enums in reverse order on a non-production database; no backfill required.
+
 ## Future phases
 
-- **G2:** Persistent `AgentRun` / `TaskRun` / event state (deliberate Prisma migration review).
 - **G3:** CTO event loop with safe automatic assignment and guarded actions.
 - **G4:** Specialist agents + QA / deployment / reliability closed loop.
