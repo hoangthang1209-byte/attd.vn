@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildPostBuildApprovedDedupeKey,
+  derivePendingActionFromIdempotencyKey,
   detectNoProgressLoop,
   isOrphanedPendingActionSlot,
   shouldSkipDuplicateAction,
@@ -62,6 +63,29 @@ describe("CTO loop dedupe", () => {
       }),
       true,
     );
+  });
+
+  it("derives POST_BUILD_APPROVED from legacy pending keys without stored action", () => {
+    const key = buildPostBuildApprovedDedupeKey({
+      issueNumber: 10,
+      prNumber: 2,
+      prHeadSha: "abc123",
+      reviewState: "approved",
+      ciStatus: "success",
+    });
+    const derived = derivePendingActionFromIdempotencyKey({
+      pendingActionKey: key,
+      storedPendingAction: null,
+    });
+    assert.deepEqual(derived, { kind: "resolved", action: "POST_BUILD_APPROVED" });
+  });
+
+  it("marks unknown pending key formats as ambiguous", () => {
+    const derived = derivePendingActionFromIdempotencyKey({
+      pendingActionKey: "legacy-unknown-key",
+      storedPendingAction: null,
+    });
+    assert.deepEqual(derived, { kind: "ambiguous" });
   });
 
   it("detects orphaned pending slots without a persisted last action key", () => {

@@ -19,6 +19,9 @@ const TEST_ISSUE_ASSIGN_CONCURRENT = 9_001_203;
 const TEST_ISSUE_FAILED_TERMINAL = 9_001_204;
 const TEST_ISSUE_CANCELLED_TERMINAL = 9_001_205;
 const TEST_ISSUE_ORPHAN_PENDING = 9_001_206;
+const TEST_ISSUE_ORPHAN_LEGACY_KEY = 9_001_207;
+const TEST_ISSUE_ORPHAN_MISATTRIBUTION = 9_001_208;
+const TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND = 9_001_209;
 
 function taskFixture(
   issueNumber: number,
@@ -91,6 +94,9 @@ after(async () => {
     TEST_ISSUE_FAILED_TERMINAL,
     TEST_ISSUE_CANCELLED_TERMINAL,
     TEST_ISSUE_ORPHAN_PENDING,
+    TEST_ISSUE_ORPHAN_LEGACY_KEY,
+    TEST_ISSUE_ORPHAN_MISATTRIBUTION,
+    TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND,
   ]);
   await prisma.$disconnect();
 });
@@ -333,6 +339,152 @@ describe("processCtoLoopForTask", () => {
       },
     });
     assert.equal(decisions, 1);
+  });
+
+  it("recovers legacy orphan rows with pending key only (no g3PendingAction)", async () => {
+    let approveCalls = 0;
+    const deps = {
+      postBuildApproved: async () => {
+        approveCalls += 1;
+        return { result: "approved_now" as const, issueNumber: TEST_ISSUE_ORPHAN_LEGACY_KEY, message: "ok" };
+      },
+    };
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_LEGACY_KEY, {
+        status: "building",
+        labels: ["status:building", "risk:low"],
+      }),
+    });
+    const pendingKey = buildPostBuildApprovedDedupeKey({
+      issueNumber: TEST_ISSUE_ORPHAN_LEGACY_KEY,
+      prNumber: null,
+      prHeadSha: null,
+      reviewState: null,
+      ciStatus: null,
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+        },
+      },
+    });
+
+    const recovered = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_LEGACY_KEY, {
+        status: "backlog",
+        hasBuildApproved: true,
+        labels: ["status:backlog", "risk:low"],
+      }),
+      deps,
+    });
+
+    assert.equal(approveCalls, 0);
+    assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
+    assert.equal(recovered.execution.submitted, true);
+  });
+
+  it("does not recover orphan when BUILD_APPROVED cannot be correlated to pending key", async () => {
+    const pendingKey = buildPostBuildApprovedDedupeKey({
+      issueNumber: TEST_ISSUE_ORPHAN_MISATTRIBUTION,
+      prNumber: 99,
+      prHeadSha: "abc123456789",
+      reviewState: "approved",
+      ciStatus: "success",
+    });
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_MISATTRIBUTION, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "POST_BUILD_APPROVED",
+        },
+      },
+    });
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_MISATTRIBUTION, {
+        hasBuildApproved: true,
+        linkedPullRequest: {
+          number: 99,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/99",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha: "deadbeef00000000000000000000000000000000",
+          verification: { reviewStatus: "approved", ciStatus: "success" },
+        },
+      }),
+    });
+
+    assert.equal(result.execution.skippedReason, "orphaned_pending_unconfirmed");
+    assert.equal(result.execution.submitted, false);
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: bootstrap.agentRunId } });
+    const summary = run.outputSummary as Record<string, unknown>;
+    assert.equal(summary.g3PendingActionKey, pendingKey);
+  });
+
+  it("escalates after bounded orphaned_pending_unconfirmed attempts", async () => {
+    const pendingKey = buildPostBuildApprovedDedupeKey({
+      issueNumber: TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND,
+      prNumber: null,
+      prHeadSha: null,
+      reviewState: null,
+      ciStatus: null,
+    });
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "POST_BUILD_APPROVED",
+        },
+      },
+    });
+
+    const unconfirmedTask = taskFixture(TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND, {
+      hasBuildApproved: false,
+      linkedPullRequest: {
+        number: 1,
+        title: "test",
+        url: "https://github.com/hoangthang1209-byte/attd.vn/pull/1",
+        state: "open",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        mergedAt: null,
+        merged: false,
+        mergeCommitSha: "abc1234567890123456789012345678901234567890",
+        verification: { reviewStatus: "pending", ciStatus: "pending" },
+      },
+    });
+
+    for (let i = 0; i < 3; i += 1) {
+      const tick = await processCtoLoopForTask({ task: unconfirmedTask });
+      assert.equal(tick.execution.skippedReason, "orphaned_pending_unconfirmed");
+    }
+
+    const escalated = await processCtoLoopForTask({ task: unconfirmedTask });
+    assert.equal(escalated.execution.skippedReason, "orphan_unconfirmed_escalated");
+    assert.equal(escalated.plan.selectedAction, "ESCALATE_NO_PROGRESS");
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: bootstrap.agentRunId } });
+    const summary = run.outputSummary as Record<string, unknown>;
+    assert.equal(summary.g3PendingActionKey, undefined);
   });
 
   it("recovers orphaned pending external action via observation without duplicate GitHub write", async () => {

@@ -3,6 +3,40 @@ import type { CtoLoopProtectionContext } from "@/features/agent-os/cto-loop.type
 
 export const CTO_MAX_NO_PROGRESS_ATTEMPTS = 3;
 
+/** Max consecutive orphan recoveries that could not attribute external effects. */
+export const CTO_MAX_ORPHAN_UNCONFIRMED_ATTEMPTS = 3;
+
+export type DerivedPendingActionResult =
+  | { kind: "resolved"; action: CtoAllowedAction }
+  | { kind: "ambiguous" };
+
+/**
+ * Legacy rows may only persist g3PendingActionKey. Derive the action when the key format is unambiguous.
+ */
+export function derivePendingActionFromIdempotencyKey(input: {
+  pendingActionKey: string;
+  storedPendingAction: CtoAllowedAction | null;
+}): DerivedPendingActionResult {
+  if (input.storedPendingAction) {
+    return { kind: "resolved", action: input.storedPendingAction };
+  }
+
+  const segments = input.pendingActionKey.split(":");
+  if (segments[0] !== "cto-g3" || segments.length < 2) {
+    return { kind: "ambiguous" };
+  }
+
+  const actionSegment = segments[1];
+  if (actionSegment === "post-build-approved") {
+    return { kind: "resolved", action: "POST_BUILD_APPROVED" };
+  }
+  if (actionSegment === "ci-retry") {
+    return { kind: "resolved", action: "REQUEST_CI_RETRY" };
+  }
+
+  return { kind: "ambiguous" };
+}
+
 export function buildCtoActionIdempotencyKey(parts: readonly string[]): string {
   return ["cto-g3", ...parts.filter((part) => part.length > 0)].join(":");
 }

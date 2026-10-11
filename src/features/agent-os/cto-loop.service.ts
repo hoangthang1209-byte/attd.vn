@@ -13,7 +13,12 @@ import {
   isCtoExternalWriteAction,
   type CtoAllowedAction,
 } from "@/features/agent-os/cto-action.allowlist";
-import { isOrphanedPendingActionSlot } from "@/features/agent-os/cto-loop.dedupe";
+import {
+  CTO_MAX_ORPHAN_UNCONFIRMED_ATTEMPTS,
+  derivePendingActionFromIdempotencyKey,
+  isOrphanedPendingActionSlot,
+} from "@/features/agent-os/cto-loop.dedupe";
+import { observationConfirmsPendingExternalAction } from "@/features/agent-os/cto-loop.orphan-attribution";
 import { planCtoLoopStep } from "@/features/agent-os/cto-loop.engine";
 import { evaluateCtoTaskPriority } from "@/features/agent-os/cto-priority";
 import {
@@ -94,12 +99,57 @@ function parsePendingAction(summary: AgentRunSummaryJson): CtoAllowedAction | nu
   return raw;
 }
 
-function observationConfirmsSubmittedExternalAction(
-  action: CtoAllowedAction,
-  observation: CtoObservation,
-): boolean {
-  if (action === "POST_BUILD_APPROVED") return observation.hasBuildApproved;
-  return false;
+function resolveOrphanPendingAction(input: {
+  pendingActionKey: string;
+  summary: AgentRunSummaryJson;
+}): CtoAllowedAction | null {
+  const derived = derivePendingActionFromIdempotencyKey({
+    pendingActionKey: input.pendingActionKey,
+    storedPendingAction: parsePendingAction(input.summary),
+  });
+  if (derived.kind === "ambiguous") return null;
+  return derived.action;
+}
+
+function buildAmbiguousOrphanEscalationPlan(input: {
+  pendingActionKey: string;
+  observation: CtoObservation;
+}): CtoLoopPlan {
+  const priority = evaluateCtoTaskPriority(input.observation);
+  return {
+    assignedAgentId: "ATTD_CTO",
+    priority,
+    selectedAction: "WAIT_HUMAN",
+    idempotencyKey: `cto-g3:orphan-ambiguous:${input.pendingActionKey}`,
+    escalate: true,
+    humanApprovalRequired: true,
+    rationale: "Orphaned pending slot with ambiguous idempotency key — manual recovery required",
+    verification: buildVerificationExpectation("WAIT_HUMAN"),
+    blockerReason: "Không thể suy luận action từ g3PendingActionKey — cần can thiệp thủ công",
+    nextAction: "Owner xác minh trạng thái GitHub và reset pending slot nếu cần",
+    decisionType: "ESCALATE",
+  };
+}
+
+function buildOrphanUnconfirmedEscalationPlan(input: {
+  pendingActionKey: string;
+  observation: CtoObservation;
+  attemptCount: number;
+}): CtoLoopPlan {
+  const priority = evaluateCtoTaskPriority(input.observation);
+  return {
+    assignedAgentId: "ATTD_CTO",
+    priority,
+    selectedAction: "ESCALATE_NO_PROGRESS",
+    idempotencyKey: `cto-g3:orphan-unconfirmed-escalate:${input.pendingActionKey}:${input.attemptCount}`,
+    escalate: true,
+    humanApprovalRequired: true,
+    rationale: "Orphaned pending action could not be attributed after bounded recovery attempts",
+    verification: buildVerificationExpectation("ESCALATE_NO_PROGRESS"),
+    blockerReason: "Không xác nhận được tác dụng ngoài sau crash recovery",
+    nextAction: "Owner xem xét và can thiệp thủ công",
+    decisionType: "ESCALATE",
+  };
 }
 
 function buildOrphanRecoveryPlan(input: {
@@ -229,6 +279,28 @@ function evidenceIndicatesVerified(evidenceRefs: unknown): boolean {
   return false;
 }
 
+function evidenceRecoveryMarker(evidenceRefs: unknown): string | null {
+  if (!Array.isArray(evidenceRefs)) return null;
+  for (const ref of evidenceRefs) {
+    if (
+      ref &&
+      typeof ref === "object" &&
+      "type" in ref &&
+      ref.type === "manual" &&
+      "ref" in ref &&
+      typeof ref.ref === "string"
+    ) {
+      try {
+        const parsed = JSON.parse(ref.ref) as { recovery?: string };
+        if (typeof parsed.recovery === "string") return parsed.recovery;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
 export async function countNoProgressAttempts(issueNumber: number): Promise<number> {
   const recent = await prisma.agentDecision.findMany({
     where: { agentRun: { githubIssueNumber: issueNumber, agentId: "ATTD_CTO" } },
@@ -242,14 +314,35 @@ export async function countNoProgressAttempts(issueNumber: number): Promise<numb
     const verified = evidenceIndicatesVerified(row.evidenceRefs);
     if (verified) break;
 
+    const recovery = evidenceRecoveryMarker(row.evidenceRefs);
     const action = row.selectedAction;
     const countsAsNoProgress =
+      recovery === "orphaned_pending_unconfirmed" ||
       action === "NOOP" ||
       action?.startsWith("ESCALATE") ||
       action === "POST_BUILD_APPROVED" ||
       action === "REQUEST_CI_RETRY";
 
     if (countsAsNoProgress) {
+      streak += 1;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+export async function countOrphanUnconfirmedAttempts(issueNumber: number): Promise<number> {
+  const recent = await prisma.agentDecision.findMany({
+    where: { agentRun: { githubIssueNumber: issueNumber, agentId: "ATTD_CTO" } },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: { evidenceRefs: true },
+  });
+
+  let streak = 0;
+  for (const row of recent) {
+    if (evidenceRecoveryMarker(row.evidenceRefs) === "orphaned_pending_unconfirmed") {
       streak += 1;
     } else {
       break;
@@ -339,6 +432,8 @@ type PersistCtoStepInput = {
   plan: CtoLoopPlan;
   verification: CtoVerificationOutcome;
   executionSubmitted: boolean;
+  executionRecoveryMarker?: string | null;
+  retainPendingActionSlot?: boolean;
   refreshedRun: {
     status: string;
     outputSummary: unknown;
@@ -371,6 +466,9 @@ async function persistCtoLoopStep(input: PersistCtoStepInput): Promise<void> {
                     priority: input.plan.priority.reason,
                     verified: input.verification,
                     idempotencyKey: input.plan.idempotencyKey,
+                    ...(input.executionRecoveryMarker
+                      ? { recovery: input.executionRecoveryMarker }
+                      : {}),
                   }),
                 },
               ] as unknown as Prisma.InputJsonValue,
@@ -410,14 +508,22 @@ async function persistCtoLoopStep(input: PersistCtoStepInput): Promise<void> {
               blockerReason: input.plan.blockerReason,
               nextAction: input.plan.nextAction,
               humanApprovalRequired: input.plan.humanApprovalRequired,
-              outputSummary: outputSummaryWithG3(run.outputSummary, {
-                g3LastActionKey: input.plan.idempotencyKey,
-                g3LastAction: input.plan.selectedAction,
-                g3LastVerified: input.verification,
-                g3PriorityReason: input.plan.priority.reason,
-                g3PriorityTier: input.plan.priority.tier,
-                g3AssignedAgent: input.plan.assignedAgentId,
-              }) as Prisma.InputJsonValue,
+              outputSummary: (input.retainPendingActionSlot
+                ? {
+                    ...parseOutputSummary(run.outputSummary),
+                    g3LastVerified: input.verification,
+                    g3PriorityReason: input.plan.priority.reason,
+                    g3PriorityTier: input.plan.priority.tier,
+                    g3AssignedAgent: input.plan.assignedAgentId,
+                  }
+                : outputSummaryWithG3(run.outputSummary, {
+                    g3LastActionKey: input.plan.idempotencyKey,
+                    g3LastAction: input.plan.selectedAction,
+                    g3LastVerified: input.verification,
+                    g3PriorityReason: input.plan.priority.reason,
+                    g3PriorityTier: input.plan.priority.tier,
+                    g3AssignedAgent: input.plan.assignedAgentId,
+                  })) as Prisma.InputJsonValue,
               startedAt: run.startedAt ?? (nextStatus === "RUNNING" ? new Date() : null),
               finishedAt:
                 nextStatus === "SUCCEEDED" || nextStatus === "FAILED" || nextStatus === "CANCELLED"
@@ -582,29 +688,72 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
 
   const orphanedPendingSlot =
     pendingActionKey &&
-    pendingAction &&
     isOrphanedPendingActionSlot({
       pendingActionKey,
       lastActionKey,
       proposedKey: pendingActionKey,
     });
 
-  if (orphanedPendingSlot) {
-    const submitted = observationConfirmsSubmittedExternalAction(pendingAction, observationBefore);
-    planForPersist =
-      plan.selectedAction === pendingAction && plan.idempotencyKey === pendingActionKey
-        ? plan
-        : buildOrphanRecoveryPlan({
-            action: pendingAction,
-            idempotencyKey: pendingActionKey,
-            observation: observationBefore,
-          });
+  const resolvedOrphanAction =
+    pendingActionKey && orphanedPendingSlot
+      ? resolveOrphanPendingAction({ pendingActionKey, summary: outputSummary })
+      : null;
+
+  let executionRecoveryMarker: string | null = null;
+  let retainPendingActionSlot = false;
+
+  if (orphanedPendingSlot && !resolvedOrphanAction) {
+    planForPersist = buildAmbiguousOrphanEscalationPlan({
+      pendingActionKey,
+      observation: observationBefore,
+    });
     execution = {
-      action: pendingAction,
-      idempotencyKey: pendingActionKey,
-      submitted,
-      skippedReason: submitted ? "orphaned_pending_recovered" : "orphaned_pending_unconfirmed",
+      action: "WAIT_HUMAN",
+      idempotencyKey: planForPersist.idempotencyKey,
+      submitted: false,
+      skippedReason: "orphaned_pending_ambiguous",
     };
+    executionRecoveryMarker = "orphaned_pending_ambiguous";
+  } else if (orphanedPendingSlot && resolvedOrphanAction) {
+    const unconfirmedStreak = await countOrphanUnconfirmedAttempts(issueNumber);
+    if (unconfirmedStreak >= CTO_MAX_ORPHAN_UNCONFIRMED_ATTEMPTS) {
+      await releaseCtoPendingActionKey(run.id);
+      planForPersist = buildOrphanUnconfirmedEscalationPlan({
+        pendingActionKey,
+        observation: observationBefore,
+        attemptCount: unconfirmedStreak,
+      });
+      execution = {
+        action: "ESCALATE_NO_PROGRESS",
+        idempotencyKey: planForPersist.idempotencyKey,
+        submitted: true,
+        skippedReason: "orphan_unconfirmed_escalated",
+      };
+    } else {
+      const submitted = observationConfirmsPendingExternalAction({
+        action: resolvedOrphanAction,
+        pendingIdempotencyKey: pendingActionKey,
+        observation: observationBefore,
+      });
+      planForPersist =
+        plan.selectedAction === resolvedOrphanAction && plan.idempotencyKey === pendingActionKey
+          ? plan
+          : buildOrphanRecoveryPlan({
+              action: resolvedOrphanAction,
+              idempotencyKey: pendingActionKey,
+              observation: observationBefore,
+            });
+      execution = {
+        action: resolvedOrphanAction,
+        idempotencyKey: pendingActionKey,
+        submitted,
+        skippedReason: submitted ? "orphaned_pending_recovered" : "orphaned_pending_unconfirmed",
+      };
+      if (!submitted) {
+        executionRecoveryMarker = "orphaned_pending_unconfirmed";
+        retainPendingActionSlot = true;
+      }
+    }
   } else if (plan.selectedAction === "NOOP") {
     execution = {
       action: "NOOP",
@@ -619,17 +768,22 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
       selectedAction: plan.selectedAction,
     });
     if (!actionSlotClaimed) {
+      const effectivePendingAction =
+        pendingActionKey != null
+          ? resolveOrphanPendingAction({ pendingActionKey, summary: outputSummary })
+          : pendingAction;
       const orphanFromClaim =
         isOrphanedPendingActionSlot({
           pendingActionKey,
           lastActionKey,
           proposedKey: plan.idempotencyKey,
-        }) && pendingAction === plan.selectedAction;
+        }) && effectivePendingAction === plan.selectedAction;
       if (orphanFromClaim) {
-        const submitted = observationConfirmsSubmittedExternalAction(
-          plan.selectedAction,
-          observationBefore,
-        );
+        const submitted = observationConfirmsPendingExternalAction({
+          action: plan.selectedAction,
+          pendingIdempotencyKey: plan.idempotencyKey,
+          observation: observationBefore,
+        });
         planForPersist = plan;
         execution = {
           action: plan.selectedAction,
@@ -637,6 +791,10 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
           submitted,
           skippedReason: submitted ? "orphaned_pending_recovered" : "orphaned_pending_unconfirmed",
         };
+        if (!submitted) {
+          executionRecoveryMarker = "orphaned_pending_unconfirmed";
+          retainPendingActionSlot = true;
+        }
       } else {
         execution = {
           action: plan.selectedAction,
@@ -678,13 +836,20 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     plan: planForPersist,
     verification,
     executionSubmitted: execution.submitted,
+    executionRecoveryMarker,
+    retainPendingActionSlot,
     refreshedRun,
   };
 
   const orphanRecovered = execution.skippedReason === "orphaned_pending_recovered";
+  const orphanAmbiguous = execution.skippedReason === "orphaned_pending_ambiguous";
+  const orphanEscalated = execution.skippedReason === "orphan_unconfirmed_escalated";
   const shouldPersistDecision =
     planForPersist.selectedAction !== "NOOP" &&
-    (orphanRecovered || execution.skippedReason !== "concurrent_or_duplicate_action");
+    (orphanRecovered ||
+      orphanAmbiguous ||
+      orphanEscalated ||
+      execution.skippedReason !== "concurrent_or_duplicate_action");
   const shouldPersistDuplicateNoop =
     plan.selectedAction === "NOOP" && (input.duplicateSourceEvent ?? false);
 
@@ -697,6 +862,9 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
         await persistCtoLoopStepMandatory(persistInput, persistStep);
       } else {
         await persistStep(persistInput);
+      }
+      if (orphanAmbiguous) {
+        await releaseCtoPendingActionKey(run.id).catch(() => undefined);
       }
     } catch (error) {
       if (actionSlotClaimed) {
@@ -716,7 +884,8 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     skipped:
       plan.selectedAction === "NOOP" ||
       execution.skippedReason === "concurrent_or_duplicate_action" ||
-      execution.skippedReason === "orphaned_pending_unconfirmed",
+      execution.skippedReason === "orphaned_pending_unconfirmed" ||
+      execution.skippedReason === "orphaned_pending_ambiguous",
   };
 }
 
