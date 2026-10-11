@@ -6382,3 +6382,131 @@ model ItemProductionIssue {
   @@index([createdAt])
   @@index([issueType])
 }
+
+// --- Agent OS (Phase G2): durable execution state ---
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  WAITING_EXTERNAL
+  WAITING_HUMAN
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AgentEventSource {
+  GITHUB_ISSUE_STATUS
+  GITHUB_PR
+  CI_RESULT
+  REVIEWER_RESULT
+  VERCEL_DEPLOYMENT
+  MANUAL_OWNER
+}
+
+enum AgentDecisionType {
+  ROUTE
+  ESCALATE
+  APPROVE_BUILD
+  BLOCK
+  RETRY
+  COMPLETE
+  OTHER
+}
+
+enum AgentOperationalRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  UNKNOWN
+}
+
+model AgentRun {
+  id                        String           @id @default(cuid())
+  agentId                   String
+  status                    AgentRunStatus   @default(QUEUED)
+  triggerSource             AgentEventSource
+  attemptNumber             Int              @default(1)
+  githubIssueNumber         Int?
+  correlationId             String?
+  parentRunId               String?
+  idempotencyKey            String?          @unique
+  inputSummary              Json?
+  outputSummary             Json?
+  blockerReason             String?          @db.Text
+  nextAction                String?          @db.Text
+  humanApprovalRequired     Boolean          @default(false)
+  humanApprovalReceivedAt   DateTime?
+  startedAt                 DateTime?
+  finishedAt                DateTime?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  parentRun AgentRun?       @relation("AgentRunRetryChain", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns AgentRun[]      @relation("AgentRunRetryChain")
+  taskRuns  TaskRun[]
+  events    AgentEvent[]
+  decisions AgentDecision[]
+
+  @@index([agentId, status])
+  @@index([githubIssueNumber, attemptNumber])
+  @@index([correlationId])
+  @@index([status, updatedAt])
+}
+
+model TaskRun {
+  id                String         @id @default(cuid())
+  agentRunId        String
+  githubIssueNumber Int?
+  status            AgentRunStatus @default(QUEUED)
+  attemptNumber     Int            @default(1)
+  taskArea          String?
+  inputSummary      Json?
+  outputSummary     Json?
+  blockerReason     String?        @db.Text
+  nextAction        String?        @db.Text
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  agentRun AgentRun     @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  events   AgentEvent[]
+
+  @@index([agentRunId])
+  @@index([githubIssueNumber])
+}
+
+model AgentEvent {
+  id             String           @id @default(cuid())
+  agentRunId     String
+  taskRunId      String?
+  source         AgentEventSource
+  idempotencyKey String           @unique
+  payloadSummary Json?
+  appliedAt      DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+
+  agentRun AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  taskRun  TaskRun?  @relation(fields: [taskRunId], references: [id], onDelete: SetNull)
+
+  @@index([agentRunId, appliedAt])
+  @@index([source])
+}
+
+model AgentDecision {
+  id                      String                    @id @default(cuid())
+  agentRunId              String
+  decisionType            AgentDecisionType
+  rationaleSummary        String                    @db.Text
+  riskLevel               AgentOperationalRiskLevel @default(UNKNOWN)
+  humanApprovalRequired   Boolean                   @default(false)
+  humanApprovalReceivedAt DateTime?
+  selectedAction          String?
+  evidenceRefs            Json?
+  createdAt               DateTime                  @default(now())
+
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([agentRunId, createdAt])
+}
