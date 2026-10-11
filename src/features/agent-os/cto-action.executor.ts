@@ -6,6 +6,18 @@ export type CtoActionExecutorDeps = {
   postBuildApproved: (issueNumber: number) => Promise<ApproveBuildResponse>;
 };
 
+export async function resolveCtoActionExecutorDeps(
+  overrides?: CtoActionExecutorDeps,
+): Promise<CtoActionExecutorDeps> {
+  if (overrides) return overrides;
+  const { approveBuildForIssue } = await import(
+    "@/features/automation/automation-approve-build.service"
+  );
+  return {
+    postBuildApproved: (issueNumber) => approveBuildForIssue(String(issueNumber)),
+  };
+}
+
 export async function executeCtoAllowedAction(input: {
   plan: CtoLoopPlan;
   observation: CtoObservation;

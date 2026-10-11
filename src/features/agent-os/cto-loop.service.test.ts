@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { ingestGitHubIssueStatusEvent } from "@/features/agent-os/agent-event.ingestion";
+import { isTerminalAgentRunStatus } from "@/features/agent-os/agent-run.state-machine";
 import { processCtoLoopForTask } from "@/features/agent-os/cto-loop.service";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
 import { prisma } from "@/lib/prisma";
 
 const TEST_ISSUE_IDEMPOTENT = 9_001_197;
 const TEST_ISSUE_HIGH_RISK = 9_001_198;
+const TEST_ISSUE_TERMINAL_RESUME = 9_001_199;
 
 function taskFixture(
   issueNumber: number,
@@ -68,7 +70,11 @@ async function cleanupIssues(issueNumbers: number[]) {
 }
 
 after(async () => {
-  await cleanupIssues([TEST_ISSUE_IDEMPOTENT, TEST_ISSUE_HIGH_RISK]);
+  await cleanupIssues([
+    TEST_ISSUE_IDEMPOTENT,
+    TEST_ISSUE_HIGH_RISK,
+    TEST_ISSUE_TERMINAL_RESUME,
+  ]);
   await prisma.$disconnect();
 });
 
@@ -100,6 +106,33 @@ describe("processCtoLoopForTask", () => {
     });
     assert.equal(runs, 1);
     assert.ok(first.agentRunId);
+  });
+
+  it("creates a new CTO attempt after a terminal SUCCEEDED run without mutating the prior run", async () => {
+    const first = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL_RESUME, { status: "building" }),
+    });
+
+    const finishedAt = new Date("2026-06-01T12:00:00.000Z");
+    await prisma.agentRun.update({
+      where: { id: first.agentRunId },
+      data: { status: "SUCCEEDED", finishedAt },
+    });
+
+    const second = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL_RESUME, { status: "building" }),
+    });
+
+    assert.notEqual(second.agentRunId, first.agentRunId);
+
+    const terminalRun = await prisma.agentRun.findUniqueOrThrow({ where: { id: first.agentRunId } });
+    assert.equal(terminalRun.status, "SUCCEEDED");
+    assert.equal(terminalRun.finishedAt?.toISOString(), finishedAt.toISOString());
+
+    const resumed = await prisma.agentRun.findUniqueOrThrow({ where: { id: second.agentRunId } });
+    assert.equal(resumed.parentRunId, first.agentRunId);
+    assert.equal(resumed.attemptNumber, terminalRun.attemptNumber + 1);
+    assert.equal(isTerminalAgentRunStatus(resumed.status), false);
   });
 
   it("escalates high-risk tasks without posting BUILD_APPROVED", async () => {

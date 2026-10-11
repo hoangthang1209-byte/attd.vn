@@ -154,10 +154,10 @@ Implementation lives under `src/features/agent-os/`:
 
 ### Allowed actions (initial G3)
 
-- `ASSIGN_AGENT` — record G1 routing assignment (CTO-owned run, specialist in `outputSummary.g3AssignedAgent`)
+- `ASSIGN_AGENT` — **phase-1 persistence only**: records G1 routing on the CTO run (`outputSummary.g3AssignedAgent`); does not spawn a specialist `AgentRun` yet (G4)
 - `WAIT_EXTERNAL` / `WAIT_HUMAN` — pipeline or human blockers
-- `POST_BUILD_APPROVED` — **only** through existing `approveBuildForIssue` eligibility + idempotency guards
-- `REQUEST_CI_RETRY` — records safe orchestrator retry intent (no unrestricted CI mutation)
+- `POST_BUILD_APPROVED` — **only** through existing `approveBuildForIssue` eligibility + idempotency guards (`processCtoLoopForTask` wires this by default; tests may inject mocks)
+- `REQUEST_CI_RETRY` — **phase-1 persistence only**: records orchestrator retry intent on the CTO run; does not enqueue CI/orchestrator jobs yet (follow-up wiring)
 - `ESCALATE_HIGH_RISK` / `ESCALATE_NO_PROGRESS` — human approval required
 - `ADVANCE_AFTER_VERIFIED_STATE` — close loop after verified post-merge/deploy signals
 - `NOOP` / `RECORD_DECISION`
