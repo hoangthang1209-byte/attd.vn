@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type { InboundAgentEvent } from "@/features/agent-os/agent-event.ingestion";
 import {
   applyInboundEventToRunFields,
@@ -40,6 +40,10 @@ export type RecordAgentDecisionInput = {
   selectedAction?: string | null;
   evidenceRefs?: AgentDecisionEvidenceRef[] | null;
 };
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
 
 function toJsonValue(value: AgentRunSummaryJson | null | undefined): Prisma.InputJsonValue | undefined {
   if (value == null) return undefined;
@@ -86,20 +90,30 @@ export async function createAgentRun(input: CreateAgentRunInput) {
     if (existing) return existing;
   }
 
-  return prisma.agentRun.create({
-    data: {
-      agentId: input.agentId,
-      triggerSource: input.triggerSource,
-      githubIssueNumber: input.githubIssueNumber ?? null,
-      correlationId: input.correlationId ?? null,
-      parentRunId: input.parentRunId ?? null,
-      idempotencyKey: input.idempotencyKey ?? null,
-      inputSummary: toJsonValue(input.inputSummary),
-      humanApprovalRequired: input.humanApprovalRequired ?? false,
-      attemptNumber: input.attemptNumber ?? 1,
-      status: "QUEUED",
-    },
-  });
+  try {
+    return await prisma.agentRun.create({
+      data: {
+        agentId: input.agentId,
+        triggerSource: input.triggerSource,
+        githubIssueNumber: input.githubIssueNumber ?? null,
+        correlationId: input.correlationId ?? null,
+        parentRunId: input.parentRunId ?? null,
+        idempotencyKey: input.idempotencyKey ?? null,
+        inputSummary: toJsonValue(input.inputSummary),
+        humanApprovalRequired: input.humanApprovalRequired ?? false,
+        attemptNumber: input.attemptNumber ?? 1,
+        status: "QUEUED",
+      },
+    });
+  } catch (error) {
+    if (input.idempotencyKey && isUniqueViolation(error)) {
+      const existing = await prisma.agentRun.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
 export async function createTaskRunForAgentRun(input: {
@@ -136,7 +150,12 @@ export async function applyInboundAgentEvent(input: {
   inbound: InboundAgentEvent;
 }): Promise<ApplyInboundEventResult> {
   const existingEvent = await prisma.agentEvent.findUnique({
-    where: { idempotencyKey: input.inbound.idempotencyKey },
+    where: {
+      agentRunId_idempotencyKey: {
+        agentRunId: input.agentRunId,
+        idempotencyKey: input.inbound.idempotencyKey,
+      },
+    },
   });
   if (existingEvent) {
     return {
@@ -149,27 +168,50 @@ export async function applyInboundAgentEvent(input: {
 
   const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: input.agentRunId } });
   if (isTerminalAgentRunStatus(run.status)) {
-    const event = await prisma.agentEvent.create({
-      data: {
+    try {
+      const event = await prisma.agentEvent.create({
+        data: {
+          agentRunId: run.id,
+          taskRunId: input.taskRunId ?? null,
+          source: input.inbound.source,
+          idempotencyKey: input.inbound.idempotencyKey,
+          payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
+        },
+      });
+      return {
+        applied: false,
         agentRunId: run.id,
-        taskRunId: input.taskRunId ?? null,
-        source: input.inbound.source,
-        idempotencyKey: input.inbound.idempotencyKey,
-        payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
-      },
-    });
-    return {
-      applied: false,
-      agentRunId: run.id,
-      eventId: event.id,
-      duplicate: false,
-      skippedDueToTerminal: true,
-    };
+        eventId: event.id,
+        duplicate: false,
+        skippedDueToTerminal: true,
+      };
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        const existing = await prisma.agentEvent.findUniqueOrThrow({
+          where: {
+            agentRunId_idempotencyKey: {
+              agentRunId: run.id,
+              idempotencyKey: input.inbound.idempotencyKey,
+            },
+          },
+        });
+        return {
+          applied: false,
+          agentRunId: run.id,
+          eventId: existing.id,
+          duplicate: true,
+          skippedDueToTerminal: true,
+        };
+      }
+      throw error;
+    }
   }
 
   const nextFields = applyInboundEventToRunFields(runToMutableFields(run), input.inbound);
 
-  const event = await prisma.$transaction(async (tx) => {
+  let event;
+  try {
+    event = await prisma.$transaction(async (tx) => {
     const created = await tx.agentEvent.create({
       data: {
         agentRunId: run.id,
@@ -198,8 +240,27 @@ export async function applyInboundAgentEvent(input: {
       });
     }
 
-    return created;
-  });
+      return created;
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      const existing = await prisma.agentEvent.findUniqueOrThrow({
+        where: {
+          agentRunId_idempotencyKey: {
+            agentRunId: run.id,
+            idempotencyKey: input.inbound.idempotencyKey,
+          },
+        },
+      });
+      return {
+        applied: false,
+        agentRunId: run.id,
+        eventId: existing.id,
+        duplicate: true,
+      };
+    }
+    throw error;
+  }
 
   return { applied: true, agentRunId: run.id, eventId: event.id, duplicate: false };
 }
@@ -239,19 +300,16 @@ export async function retryAgentRun(input: {
   const correlationId = failed.correlationId ?? failed.id;
   const nextAttempt = failed.attemptNumber + 1;
 
-  return prisma.agentRun.create({
-    data: {
-      agentId: failed.agentId,
-      triggerSource: input.triggerSource,
-      githubIssueNumber: failed.githubIssueNumber,
-      correlationId,
-      parentRunId: failed.id,
-      idempotencyKey: input.idempotencyKey,
-      attemptNumber: nextAttempt,
-      inputSummary: failed.inputSummary ?? undefined,
-      humanApprovalRequired: failed.humanApprovalRequired,
-      status: "QUEUED",
-    },
+  return createAgentRun({
+    agentId: failed.agentId,
+    triggerSource: input.triggerSource,
+    githubIssueNumber: failed.githubIssueNumber,
+    correlationId,
+    parentRunId: failed.id,
+    idempotencyKey: input.idempotencyKey,
+    attemptNumber: nextAttempt,
+    inputSummary: (failed.inputSummary as AgentRunSummaryJson | null) ?? undefined,
+    humanApprovalRequired: failed.humanApprovalRequired,
   });
 }
 
