@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { ingestGitHubIssueStatusEvent } from "@/features/agent-os/agent-event.ingestion";
-import { processCtoLoopForTask } from "@/features/agent-os/cto-loop.service";
+import {
+  persistCtoLoopStepForIntegrationTests,
+  processCtoLoopForTask,
+} from "@/features/agent-os/cto-loop.service";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
 import { prisma } from "@/lib/prisma";
 
@@ -9,6 +12,10 @@ const TEST_ISSUE_IDEMPOTENT = 9_001_197;
 const TEST_ISSUE_HIGH_RISK = 9_001_198;
 const TEST_ISSUE_TERMINAL = 9_001_199;
 const TEST_ISSUE_CONCURRENT = 9_001_200;
+const TEST_ISSUE_PERSIST_RECOVERY = 9_001_201;
+const TEST_ISSUE_EXECUTE_RETRY = 9_001_202;
+const TEST_ISSUE_ASSIGN_CONCURRENT = 9_001_203;
+const TEST_ISSUE_FAILED_TERMINAL = 9_001_204;
 
 function taskFixture(
   issueNumber: number,
@@ -75,6 +82,10 @@ after(async () => {
     TEST_ISSUE_HIGH_RISK,
     TEST_ISSUE_TERMINAL,
     TEST_ISSUE_CONCURRENT,
+    TEST_ISSUE_PERSIST_RECOVERY,
+    TEST_ISSUE_EXECUTE_RETRY,
+    TEST_ISSUE_ASSIGN_CONCURRENT,
+    TEST_ISSUE_FAILED_TERMINAL,
   ]);
   await prisma.$disconnect();
 });
@@ -214,5 +225,137 @@ describe("processCtoLoopForTask", () => {
     const submittedCount = [a, b].filter((r) => r.execution.submitted).length;
     assert.equal(submittedCount, 1);
     assert.ok(approveCalls <= 1);
+  });
+
+  it("recovers audit persistence after external write when first persist attempts fail", async () => {
+    let persistCalls = 0;
+
+    const deps = {
+      postBuildApproved: async (issueNumber: number) => ({
+        result: "approved_now" as const,
+        issueNumber,
+        message: "ok",
+      }),
+    };
+
+    const task = taskFixture(TEST_ISSUE_PERSIST_RECOVERY, {
+      status: "backlog",
+      hasBuildApproved: false,
+      labels: ["status:backlog", "risk:low"],
+    });
+
+    const result = await processCtoLoopForTask({
+      task,
+      deps,
+      persistStepOverride: async (input) => {
+        persistCalls += 1;
+        if (persistCalls <= 2) {
+          throw new Error("simulated persist failure");
+        }
+        await persistCtoLoopStepForIntegrationTests(input);
+      },
+    });
+
+    assert.equal(result.execution.submitted, true);
+    assert.ok(persistCalls >= 3);
+
+    const decisions = await prisma.agentDecision.count({
+      where: { agentRun: { githubIssueNumber: TEST_ISSUE_PERSIST_RECOVERY } },
+    });
+    assert.equal(decisions, 1);
+
+    const run = await prisma.agentRun.findFirstOrThrow({
+      where: { githubIssueNumber: TEST_ISSUE_PERSIST_RECOVERY, agentId: "ATTD_CTO" },
+    });
+    const summary = run.outputSummary as Record<string, unknown>;
+    assert.equal(typeof summary.g3LastActionKey, "string");
+    assert.equal(summary.g3PendingActionKey, undefined);
+  });
+
+  it("clears pending action slot after execute error so retry can succeed", async () => {
+    let approveCalls = 0;
+    const deps = {
+      postBuildApproved: async (issueNumber: number) => {
+        approveCalls += 1;
+        if (approveCalls === 1) {
+          throw new Error("simulated upstream failure");
+        }
+        return { result: "approved_now" as const, issueNumber, message: "ok" };
+      },
+    };
+
+    const task = taskFixture(TEST_ISSUE_EXECUTE_RETRY, {
+      status: "backlog",
+      hasBuildApproved: false,
+      labels: ["status:backlog", "risk:low"],
+    });
+
+    await assert.rejects(() => processCtoLoopForTask({ task, deps }));
+
+    const runAfterFailure = await prisma.agentRun.findFirstOrThrow({
+      where: { githubIssueNumber: TEST_ISSUE_EXECUTE_RETRY, agentId: "ATTD_CTO" },
+    });
+    const pendingAfterFailure = (runAfterFailure.outputSummary as Record<string, unknown>)
+      .g3PendingActionKey;
+    assert.equal(pendingAfterFailure, undefined);
+
+    const retry = await processCtoLoopForTask({ task, deps });
+    assert.equal(retry.execution.submitted, true);
+    assert.equal(approveCalls, 2);
+  });
+
+  it("prevents concurrent non-external actions from double-persisting decisions", async () => {
+    const task = taskFixture(TEST_ISSUE_ASSIGN_CONCURRENT, {
+      status: "building",
+      labels: ["status:building", "risk:low"],
+    });
+
+    const [a, b] = await Promise.all([
+      processCtoLoopForTask({ task }),
+      processCtoLoopForTask({ task }),
+    ]);
+
+    assert.equal(a.plan.selectedAction, "WAIT_EXTERNAL");
+    assert.equal(b.plan.selectedAction, "WAIT_EXTERNAL");
+
+    const persisted = [a, b].filter((r) => !r.skipped).length;
+    assert.ok(persisted <= 1);
+
+    const decisions = await prisma.agentDecision.count({
+      where: {
+        agentRun: { githubIssueNumber: TEST_ISSUE_ASSIGN_CONCURRENT },
+        selectedAction: "WAIT_EXTERNAL",
+      },
+    });
+    assert.equal(decisions, 1);
+  });
+
+  it("creates a new CTO attempt after FAILED terminal when inbound arrives", async () => {
+    const first = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_FAILED_TERMINAL, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: first.agentRunId },
+      data: { status: "FAILED", finishedAt: new Date() },
+    });
+
+    const inbound = ingestGitHubIssueStatusEvent({
+      issueNumber: TEST_ISSUE_FAILED_TERMINAL,
+      normalizedStatus: "ci_review",
+      eventId: "g3-resume-after-failed",
+    });
+
+    const second = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_FAILED_TERMINAL, { status: "ci_review" }),
+      inbound,
+    });
+
+    assert.notEqual(second.agentRunId, first.agentRunId);
+    const resumed = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: second.agentRunId },
+    });
+    assert.equal(resumed.parentRunId, first.agentRunId);
+    assert.equal(resumed.attemptNumber, 2);
   });
 });

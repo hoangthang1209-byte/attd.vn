@@ -42,6 +42,8 @@ export type ProcessCtoLoopInput = {
   deps?: CtoActionExecutorDeps;
   /** Optional refreshed task snapshot after execution for verification. Falls back to `task`. */
   taskAfterExecution?: AutomationTask | null;
+  /** Test hook: replace default audit persistence (throws on first call to simulate DB failure). */
+  persistStepOverride?: CtoLoopPersistStepFn | null;
 };
 
 export type ProcessCtoLoopResult = {
@@ -206,6 +208,32 @@ async function lockAgentRunRow(tx: Prisma.TransactionClient, agentRunId: string)
   await tx.$queryRaw`SELECT id FROM "AgentRun" WHERE id = ${agentRunId} FOR UPDATE`;
 }
 
+async function releaseCtoPendingActionKey(agentRunId: string): Promise<void> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await prisma.$transaction(
+        async (tx) => {
+          await lockAgentRunRow(tx, agentRunId);
+          const run = await tx.agentRun.findUniqueOrThrow({ where: { id: agentRunId } });
+          const summary = parseOutputSummary(run.outputSummary);
+          if (typeof summary.g3PendingActionKey !== "string") return;
+          await tx.agentRun.update({
+            where: { id: agentRunId },
+            data: {
+              outputSummary: outputSummaryWithG3(run.outputSummary, {}) as Prisma.InputJsonValue,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      return;
+    } catch (error) {
+      if (isRetryableTxConflict(error) && attempt < 3) continue;
+      throw error;
+    }
+  }
+}
+
 async function tryClaimCtoActionSlot(input: {
   agentRunId: string;
   idempotencyKey: string;
@@ -362,6 +390,39 @@ async function persistCtoLoopStep(input: PersistCtoStepInput): Promise<void> {
   throw new Error("CTO loop persistence retry limit exceeded");
 }
 
+const CTO_PERSIST_MANDATORY_MAX_ATTEMPTS = 8;
+
+async function persistCtoLoopStepMandatory(
+  input: PersistCtoStepInput,
+  persistStep: CtoLoopPersistStepFn,
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= CTO_PERSIST_MANDATORY_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await persistStep(input);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableTxConflict(error) && attempt >= 3) break;
+    }
+  }
+
+  if (!input.executionSubmitted) {
+    throw lastError ?? new Error("CTO loop persistence retry limit exceeded");
+  }
+
+  await persistStep({
+    ...input,
+    verification: "pending",
+    plan: {
+      ...input.plan,
+      rationale: `${input.plan.rationale} (audit recovery after external submit)`,
+    },
+  });
+}
+
+export type CtoLoopPersistStepFn = typeof persistCtoLoopStep;
+
 function terminalIdleResult(input: {
   agentRunId: string;
   observation: CtoObservation;
@@ -454,7 +515,11 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
 
   const executorDeps = resolveCtoActionExecutorDeps(input.deps);
 
+  const persistStep = input.persistStepOverride ?? persistCtoLoopStep;
+
   let execution: CtoActionExecutionResult;
+  let actionSlotClaimed = false;
+
   if (plan.selectedAction === "NOOP") {
     execution = {
       action: "NOOP",
@@ -462,12 +527,12 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
       submitted: false,
       skippedReason: plan.rationale,
     };
-  } else if (isCtoExternalWriteAction(plan.selectedAction)) {
-    const claimed = await tryClaimCtoActionSlot({
+  } else {
+    actionSlotClaimed = await tryClaimCtoActionSlot({
       agentRunId: run.id,
       idempotencyKey: plan.idempotencyKey,
     });
-    if (!claimed) {
+    if (!actionSlotClaimed) {
       execution = {
         action: plan.selectedAction,
         idempotencyKey: plan.idempotencyKey,
@@ -475,18 +540,17 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
         skippedReason: "concurrent_or_duplicate_action",
       };
     } else {
-      execution = await executeCtoAllowedAction({
-        plan,
-        observation: observationBefore,
-        deps: executorDeps,
-      });
+      try {
+        execution = await executeCtoAllowedAction({
+          plan,
+          observation: observationBefore,
+          deps: executorDeps,
+        });
+      } catch (error) {
+        await releaseCtoPendingActionKey(run.id);
+        throw error;
+      }
     }
-  } else {
-    execution = await executeCtoAllowedAction({
-      plan,
-      observation: observationBefore,
-      deps: executorDeps,
-    });
   }
 
   const afterTask = input.taskAfterExecution ?? input.task;
@@ -500,31 +564,39 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     executionSubmitted: execution.submitted,
   });
 
-  if (
+  const persistInput: PersistCtoStepInput = {
+    agentRunId: run.id,
+    taskRunId,
+    issueNumber,
+    task: input.task,
+    plan,
+    verification,
+    executionSubmitted: execution.submitted,
+    refreshedRun,
+  };
+
+  const shouldPersistDecision =
     plan.selectedAction !== "NOOP" &&
-    execution.skippedReason !== "concurrent_or_duplicate_action"
-  ) {
-    await persistCtoLoopStep({
-      agentRunId: run.id,
-      taskRunId,
-      issueNumber,
-      task: input.task,
-      plan,
-      verification,
-      executionSubmitted: execution.submitted,
-      refreshedRun,
-    });
-  } else if (plan.selectedAction === "NOOP" && (input.duplicateSourceEvent ?? false)) {
-    await persistCtoLoopStep({
-      agentRunId: run.id,
-      taskRunId,
-      issueNumber,
-      task: input.task,
-      plan,
-      verification,
-      executionSubmitted: false,
-      refreshedRun,
-    });
+    execution.skippedReason !== "concurrent_or_duplicate_action";
+  const shouldPersistDuplicateNoop =
+    plan.selectedAction === "NOOP" && (input.duplicateSourceEvent ?? false);
+
+  if (shouldPersistDecision || shouldPersistDuplicateNoop) {
+    try {
+      if (
+        execution.submitted &&
+        isCtoExternalWriteAction(plan.selectedAction)
+      ) {
+        await persistCtoLoopStepMandatory(persistInput, persistStep);
+      } else {
+        await persistStep(persistInput);
+      }
+    } catch (error) {
+      if (actionSlotClaimed) {
+        await releaseCtoPendingActionKey(run.id).catch(() => undefined);
+      }
+      throw error;
+    }
   }
 
   return {
@@ -537,3 +609,6 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     skipped: plan.selectedAction === "NOOP" || execution.skippedReason === "concurrent_or_duplicate_action",
   };
 }
+
+/** @internal Used by integration tests to delegate to the real persistence implementation. */
+export { persistCtoLoopStep as persistCtoLoopStepForIntegrationTests };
