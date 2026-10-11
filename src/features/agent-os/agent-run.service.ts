@@ -45,6 +45,10 @@ function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
+function isWriteConflict(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+}
+
 function toJsonValue(value: AgentRunSummaryJson | null | undefined): Prisma.InputJsonValue | undefined {
   if (value == null) return undefined;
   return value as Prisma.InputJsonValue;
@@ -149,120 +153,114 @@ export async function applyInboundAgentEvent(input: {
   taskRunId?: string | null;
   inbound: InboundAgentEvent;
 }): Promise<ApplyInboundEventResult> {
-  const existingEvent = await prisma.agentEvent.findUnique({
-    where: {
-      agentRunId_idempotencyKey: {
-        agentRunId: input.agentRunId,
-        idempotencyKey: input.inbound.idempotencyKey,
-      },
+  const where = {
+    agentRunId_idempotencyKey: {
+      agentRunId: input.agentRunId,
+      idempotencyKey: input.inbound.idempotencyKey,
     },
-  });
-  if (existingEvent) {
-    return {
-      applied: false,
-      agentRunId: existingEvent.agentRunId,
-      eventId: existingEvent.id,
-      duplicate: true,
-    };
-  }
+  } as const;
 
-  const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: input.agentRunId } });
-  if (isTerminalAgentRunStatus(run.status)) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const event = await prisma.agentEvent.create({
-        data: {
-          agentRunId: run.id,
-          taskRunId: input.taskRunId ?? null,
-          source: input.inbound.source,
-          idempotencyKey: input.inbound.idempotencyKey,
-          payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
+      return await prisma.$transaction(
+        async (tx) => {
+          const existingEvent = await tx.agentEvent.findUnique({ where });
+          if (existingEvent) {
+            return {
+              applied: false,
+              agentRunId: existingEvent.agentRunId,
+              eventId: existingEvent.id,
+              duplicate: true,
+            };
+          }
+
+          const run = await tx.agentRun.findUniqueOrThrow({
+            where: { id: input.agentRunId },
+          });
+
+          if (isTerminalAgentRunStatus(run.status)) {
+            const event = await tx.agentEvent.create({
+              data: {
+                agentRunId: run.id,
+                taskRunId: input.taskRunId ?? null,
+                source: input.inbound.source,
+                idempotencyKey: input.inbound.idempotencyKey,
+                payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
+              },
+            });
+            return {
+              applied: false,
+              agentRunId: run.id,
+              eventId: event.id,
+              duplicate: false,
+              skippedDueToTerminal: true,
+            };
+          }
+
+          const nextFields = applyInboundEventToRunFields(
+            runToMutableFields(run),
+            input.inbound,
+          );
+
+          const event = await tx.agentEvent.create({
+            data: {
+              agentRunId: run.id,
+              taskRunId: input.taskRunId ?? null,
+              source: input.inbound.source,
+              idempotencyKey: input.inbound.idempotencyKey,
+              payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
+            },
+          });
+
+          await tx.agentRun.update({
+            where: { id: run.id },
+            data: fieldsToUpdateData(nextFields),
+          });
+
+          if (input.taskRunId) {
+            await tx.taskRun.update({
+              where: { id: input.taskRunId },
+              data: {
+                status: nextFields.status,
+                blockerReason: nextFields.blockerReason,
+                nextAction: nextFields.nextAction,
+                startedAt: nextFields.startedAt,
+                finishedAt: nextFields.finishedAt,
+              },
+            });
+          }
+
+          return {
+            applied: true,
+            agentRunId: run.id,
+            eventId: event.id,
+            duplicate: false,
+          };
         },
-      });
-      return {
-        applied: false,
-        agentRunId: run.id,
-        eventId: event.id,
-        duplicate: false,
-        skippedDueToTerminal: true,
-      };
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
     } catch (error) {
       if (isUniqueViolation(error)) {
-        const existing = await prisma.agentEvent.findUniqueOrThrow({
-          where: {
-            agentRunId_idempotencyKey: {
-              agentRunId: run.id,
-              idempotencyKey: input.inbound.idempotencyKey,
-            },
-          },
-        });
-        return {
-          applied: false,
-          agentRunId: run.id,
-          eventId: existing.id,
-          duplicate: true,
-          skippedDueToTerminal: true,
-        };
+        const existing = await prisma.agentEvent.findUnique({ where });
+        if (existing) {
+          return {
+            applied: false,
+            agentRunId: existing.agentRunId,
+            eventId: existing.id,
+            duplicate: true,
+          };
+        }
       }
+
+      if (isWriteConflict(error) && attempt < 3) {
+        continue;
+      }
+
       throw error;
     }
   }
 
-  const nextFields = applyInboundEventToRunFields(runToMutableFields(run), input.inbound);
-
-  let event: { id: string };
-  try {
-    event = await prisma.$transaction(async (tx) => {
-      const created = await tx.agentEvent.create({
-      data: {
-        agentRunId: run.id,
-        taskRunId: input.taskRunId ?? null,
-        source: input.inbound.source,
-        idempotencyKey: input.inbound.idempotencyKey,
-        payloadSummary: input.inbound.payloadSummary as Prisma.InputJsonValue,
-      },
-      });
-
-      await tx.agentRun.update({
-      where: { id: run.id },
-      data: fieldsToUpdateData(nextFields),
-    });
-
-      if (input.taskRunId) {
-        await tx.taskRun.update({
-        where: { id: input.taskRunId },
-        data: {
-          status: nextFields.status,
-          blockerReason: nextFields.blockerReason,
-          nextAction: nextFields.nextAction,
-          startedAt: nextFields.startedAt,
-          finishedAt: nextFields.finishedAt,
-        },
-        });
-      }
-
-      return created;
-    });
-  } catch (error) {
-    if (isUniqueViolation(error)) {
-      const existing = await prisma.agentEvent.findUniqueOrThrow({
-        where: {
-          agentRunId_idempotencyKey: {
-            agentRunId: run.id,
-            idempotencyKey: input.inbound.idempotencyKey,
-          },
-        },
-      });
-      return {
-        applied: false,
-        agentRunId: run.id,
-        eventId: existing.id,
-        duplicate: true,
-      };
-    }
-    throw error;
-  }
-
-  return { applied: true, agentRunId: run.id, eventId: event.id, duplicate: false };
+  throw new Error("Agent event transaction retry limit exceeded");
 }
 
 export async function recordAgentDecision(input: RecordAgentDecisionInput) {
@@ -310,31 +308,6 @@ export async function retryAgentRun(input: {
     attemptNumber: nextAttempt,
     inputSummary: (failed.inputSummary as AgentRunSummaryJson | null) ?? undefined,
     humanApprovalRequired: failed.humanApprovalRequired,
-  });
-}
-
-/** Seed helper for G2 admin visibility when no run exists yet (read-only sync stub). */
-export async function ensurePlaceholderRunForIssue(input: {
-  agentId: string;
-  githubIssueNumber: number;
-  correlationId?: string;
-}) {
-  const correlationId = input.correlationId ?? `github-issue:${input.githubIssueNumber}`;
-  const idempotencyKey = `ensure:${correlationId}`;
-
-  const existing = await prisma.agentRun.findFirst({
-    where: { githubIssueNumber: input.githubIssueNumber },
-    orderBy: { attemptNumber: "desc" },
-  });
-  if (existing) return existing;
-
-  return createAgentRun({
-    agentId: input.agentId,
-    triggerSource: "GITHUB_ISSUE_STATUS",
-    githubIssueNumber: input.githubIssueNumber,
-    correlationId,
-    idempotencyKey,
-    inputSummary: { kind: "github_issue_link", issueNumber: input.githubIssueNumber },
   });
 }
 
