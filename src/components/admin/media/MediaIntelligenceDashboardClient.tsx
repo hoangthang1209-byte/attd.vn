@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminPageTitle from "@/components/admin/AdminPageTitle";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 import { InlineLoading } from "@/components/ui/loading/ContextLoading";
 import type { MediaDashboardSnapshot } from "@/features/media/intelligence/intelligence.types";
 
 export default function MediaIntelligenceDashboardClient() {
+  const { developerMode } = useWorkspaceMode();
   const [data, setData] = useState<MediaDashboardSnapshot | null>(null);
   const [lifecycle, setLifecycle] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,9 +53,11 @@ export default function MediaIntelligenceDashboardClient() {
         <Link href="/admin/media/inbox" className="admin-btn admin-btn--secondary">
           Incoming / Review
         </Link>
-        <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary">
-          Lifecycle
-        </Link>
+        {developerMode ? (
+          <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary">
+            Lifecycle
+          </Link>
+        ) : null}
         <Link href="/admin/content/media-coverage" className="admin-btn admin-btn--secondary">
           Độ phủ hình ảnh
         </Link>
@@ -72,14 +76,14 @@ export default function MediaIntelligenceDashboardClient() {
             }}
           >
             {[
-              ["Assets", data.totals.assets],
-              ["Public", data.totals.publicAssets],
-              ["Needs review", data.totals.needsReview],
-              ["Missing alt", data.totals.missingAlt],
-              ["Duplicates", data.totals.duplicates],
-              ["Unused", data.totals.unused],
-              ["Low SEO", data.totals.lowSeo],
-              ["7 ngày gần đây", data.totals.recentlyUploaded],
+              ["Tổng ảnh", data.totals.assets],
+              ["Công khai", data.totals.publicAssets],
+              ["Cần duyệt", data.totals.needsReview],
+              ["Thiếu mô tả alt", data.totals.missingAlt],
+              ["Trùng lặp", data.totals.duplicates],
+              ["Chưa dùng", data.totals.unused],
+              ["SEO thấp", data.totals.lowSeo],
+              ["Tải lên 7 ngày", data.totals.recentlyUploaded],
             ].map(([label, value]) => (
               <div
                 key={String(label)}
@@ -96,7 +100,7 @@ export default function MediaIntelligenceDashboardClient() {
             ))}
           </section>
 
-          {data.canonicalCoverage ? (
+          {developerMode && data.canonicalCoverage ? (
             <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Canonical media migration (14.7)</h3>
               <div
@@ -131,30 +135,32 @@ export default function MediaIntelligenceDashboardClient() {
             </section>
           ) : null}
 
-          <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>AI processing</h3>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                {Object.entries(data.byAiStatus).map(([key, value]) => (
-                  <li key={key}>
-                    {key}: {value}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Visibility</h3>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                {Object.entries(data.byVisibility).map(([key, value]) => (
-                  <li key={key}>
-                    {key}: {value}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
+          {developerMode ? (
+            <section style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>AI processing</h3>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                  {Object.entries(data.byAiStatus).map(([key, value]) => (
+                    <li key={key}>
+                      {key}: {value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Visibility</h3>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+                  {Object.entries(data.byVisibility).map(([key, value]) => (
+                    <li key={key}>
+                      {key}: {value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          ) : null}
 
-          {lifecycle ? (
+          {developerMode && lifecycle ? (
             <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
               <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>
                 Lifecycle{" "}
@@ -193,7 +199,7 @@ export default function MediaIntelligenceDashboardClient() {
           ) : null}
 
           <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Bundle coverage gaps</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Thiếu ảnh theo bộ media</h3>
             {data.coverageGaps.length === 0 ? (
               <p style={{ margin: 0, color: "#6b7280", fontSize: 13 }}>Không có gap bắt buộc.</p>
             ) : (
@@ -212,7 +218,7 @@ export default function MediaIntelligenceDashboardClient() {
           </section>
 
           <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, background: "#fff" }}>
-            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Top used</h3>
+            <h3 style={{ margin: "0 0 12px", fontSize: 15 }}>Ảnh được dùng nhiều nhất</h3>
             {data.topUsed.length === 0 ? (
               <p style={{ margin: 0, color: "#6b7280", fontSize: 13 }}>Chưa có assignment.</p>
             ) : (

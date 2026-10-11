@@ -1,4 +1,11 @@
+"use client";
+
 import type { CmsHealthReport } from "@/features/admin/services/cms-health.service";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
+import {
+  getCmsBusinessStatusHint,
+  getCmsBusinessStatusLabel,
+} from "@/lib/admin/cms-health-labels";
 
 type Props = {
   health: CmsHealthReport;
@@ -23,20 +30,37 @@ function HealthItem({
   );
 }
 
-export default function CmsHealthCard({ health }: Props) {
+function BusinessHealthView({ health }: { health: CmsHealthReport }) {
+  const businessLabel = getCmsBusinessStatusLabel(health);
+  const hint = getCmsBusinessStatusHint(health);
+
+  return (
+    <>
+      <HealthItem
+        label="Kết nối dữ liệu"
+        ok={health.databaseConnected}
+        detail={health.databaseConnected ? "Ổn định" : "Lỗi"}
+      />
+      <HealthItem
+        label="Lưu trữ ảnh"
+        ok={health.blobConfigured}
+        detail={health.blobConfigured ? "Đã cấu hình" : "Chưa cấu hình"}
+      />
+      <HealthItem
+        label="Tổng thể"
+        ok={health.ready}
+        detail={businessLabel}
+      />
+      {hint ? <p className="admin-health-card-fix">{hint}</p> : null}
+    </>
+  );
+}
+
+function DeveloperHealthView({ health }: { health: CmsHealthReport }) {
   const allTablesExist = Object.values(health.tables).every(Boolean);
 
   return (
-    <section
-      className={`admin-dashboard-card admin-health-card admin-health-card--${health.status}`}
-    >
-      <div className="admin-health-card-header">
-        <p className="admin-dashboard-label">CMS Health</p>
-        <span className={`admin-health-status admin-health-status--${health.status}`}>
-          {health.statusLabel}
-        </span>
-      </div>
-
+    <>
       <HealthItem label="Database" ok={health.databaseConnected} />
       <HealthItem
         label="Prisma Tables"
@@ -64,6 +88,32 @@ export default function CmsHealthCard({ health }: Props) {
         <p className="admin-health-card-fix">
           Fix: <code>{health.fixCommand}</code>
         </p>
+      )}
+    </>
+  );
+}
+
+export default function CmsHealthCard({ health }: Props) {
+  const { developerMode } = useWorkspaceMode();
+  const businessLabel = getCmsBusinessStatusLabel(health);
+
+  return (
+    <section
+      className={`admin-dashboard-card admin-health-card admin-health-card--${health.status}`}
+    >
+      <div className="admin-health-card-header">
+        <p className="admin-dashboard-label">
+          {developerMode ? "CMS Health" : "Trạng thái CMS"}
+        </p>
+        <span className={`admin-health-status admin-health-status--${health.status}`}>
+          {developerMode ? health.statusLabel : businessLabel}
+        </span>
+      </div>
+
+      {developerMode ? (
+        <DeveloperHealthView health={health} />
+      ) : (
+        <BusinessHealthView health={health} />
       )}
     </section>
   );

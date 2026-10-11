@@ -1,4 +1,7 @@
+"use client";
+
 import type { CmsHealthReport } from "@/features/admin/services/cms-health.service";
+import { useWorkspaceMode } from "@/components/admin/content/WorkspaceModeContext";
 
 type Props = {
   health: CmsHealthReport;
@@ -13,6 +16,12 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default function CmsDiagnosticsPanel({ health }: Props) {
+  const { developerMode } = useWorkspaceMode();
+
+  if (!developerMode) {
+    return null;
+  }
+
   const showFix =
     health.databaseConnected &&
     Object.values(health.tables).some((exists) => !exists);
