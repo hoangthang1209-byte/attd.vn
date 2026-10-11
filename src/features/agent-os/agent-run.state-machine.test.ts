@@ -27,6 +27,14 @@ describe("agent run state machine", () => {
     assert.equal(canTransitionAgentRunStatus("WAITING_HUMAN", "SUCCEEDED"), true);
   });
 
+  it("allows WAITING_EXTERNAL → SUCCEEDED for production completion", () => {
+    assert.equal(canTransitionAgentRunStatus("WAITING_EXTERNAL", "SUCCEEDED"), true);
+  });
+
+  it("allows QUEUED → WAITING_HUMAN for immediate blockers", () => {
+    assert.equal(canTransitionAgentRunStatus("QUEUED", "WAITING_HUMAN"), true);
+  });
+
   it("throws on invalid transition", () => {
     assert.throws(() => assertAgentRunTransition("QUEUED", "SUCCEEDED"), AgentRunTransitionError);
   });
