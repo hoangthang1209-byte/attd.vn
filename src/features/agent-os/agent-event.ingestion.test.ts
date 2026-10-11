@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 import {
   ingestCiResultEvent,
   ingestGitHubIssueStatusEvent,
+  ingestGitHubPrEvent,
   ingestManualOwnerDecisionEvent,
+  ingestReviewerResultEvent,
+  ingestVercelDeploymentEvent,
 } from "@/features/agent-os/agent-event.ingestion";
 
 describe("agent event ingestion", () => {
@@ -31,6 +34,37 @@ describe("agent event ingestion", () => {
     });
     assert.equal(event.suggestedStatus, "WAITING_HUMAN");
     assert.match(event.blockerReason ?? "", /CI build/);
+  });
+
+  it("maps merged PRs to WAITING_EXTERNAL", () => {
+    const event = ingestGitHubPrEvent({
+      issueNumber: 186,
+      pullNumber: 187,
+      state: "closed",
+      merged: true,
+      eventId: "pr:187:merged",
+    });
+    assert.equal(event.suggestedStatus, "WAITING_EXTERNAL");
+  });
+
+  it("maps requested reviewer changes to WAITING_HUMAN", () => {
+    const event = ingestReviewerResultEvent({
+      pullNumber: 187,
+      reviewState: "changes_requested",
+      eventId: "review:187:changes",
+    });
+    assert.equal(event.suggestedStatus, "WAITING_HUMAN");
+    assert.equal(event.blockerReason, "Reviewer yêu cầu chỉnh sửa");
+  });
+
+  it("maps ready production deployments to SUCCEEDED", () => {
+    const event = ingestVercelDeploymentEvent({
+      environment: "production",
+      deploymentState: "ready",
+      commitSha: "abc1234",
+      eventId: "deploy:abc1234:ready",
+    });
+    assert.equal(event.suggestedStatus, "SUCCEEDED");
   });
 
   it("does not embed secrets in payload summary", () => {
