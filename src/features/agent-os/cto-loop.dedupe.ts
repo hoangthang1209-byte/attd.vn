@@ -1,0 +1,58 @@
+import type { CtoAllowedAction } from "@/features/agent-os/cto-action.allowlist";
+import type { CtoLoopProtectionContext } from "@/features/agent-os/cto-loop.types";
+
+export const CTO_MAX_NO_PROGRESS_ATTEMPTS = 3;
+
+export function buildCtoActionIdempotencyKey(parts: readonly string[]): string {
+  return ["cto-g3", ...parts.filter((part) => part.length > 0)].join(":");
+}
+
+export function buildPostBuildApprovedDedupeKey(input: {
+  issueNumber: number;
+  prNumber: number | null;
+  prHeadSha: string | null;
+  reviewState: string | null;
+  ciStatus: string | null;
+}): string {
+  return buildCtoActionIdempotencyKey([
+    "post-build-approved",
+    String(input.issueNumber),
+    input.prNumber ? `pr-${input.prNumber}` : "no-pr",
+    input.prHeadSha ?? "no-head",
+    input.reviewState ?? "no-review",
+    input.ciStatus ?? "no-ci",
+  ]);
+}
+
+/**
+ * Prevent re-posting identical BUILD_APPROVED when PR head + review/CI state unchanged.
+ */
+export function shouldSuppressDuplicateBuildApproved(input: {
+  hasBuildApproved: boolean;
+  proposedKey: string;
+  lastActionIdempotencyKey: string | null;
+}): boolean {
+  if (input.hasBuildApproved) return true;
+  if (!input.lastActionIdempotencyKey) return false;
+  return input.lastActionIdempotencyKey === input.proposedKey;
+}
+
+export function shouldSkipDuplicateAction(context: CtoLoopProtectionContext): boolean {
+  if (context.duplicateSourceEvent) return true;
+  if (!context.proposedActionIdempotencyKey || !context.lastActionIdempotencyKey) {
+    return false;
+  }
+  return context.proposedActionIdempotencyKey === context.lastActionIdempotencyKey;
+}
+
+export function detectNoProgressLoop(attemptCountWithoutProgress: number): boolean {
+  return attemptCountWithoutProgress >= CTO_MAX_NO_PROGRESS_ATTEMPTS;
+}
+
+export function shouldBlockConcurrentExecution(input: {
+  hasActiveNonTerminalRun: boolean;
+  action: CtoAllowedAction;
+}): boolean {
+  if (!input.hasActiveNonTerminalRun) return false;
+  return input.action === "POST_BUILD_APPROVED" || input.action === "REQUEST_CI_RETRY";
+}
