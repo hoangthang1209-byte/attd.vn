@@ -20,31 +20,33 @@ type Props = {
 };
 
 export default function AutomationAgentRunPanel({ issueNumber, active }: Props) {
-  const [data, setData] = useState<AgentRunHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    issueNumber: number;
+    data: AgentRunHistoryResponse | null;
+    error: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!active) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     void fetch(`/api/admin/automation/agent-runs?issueNumber=${issueNumber}&limit=10`)
       .then(async (response) => {
         const json = (await response.json()) as AgentRunHistoryResponse & { message?: string };
         if (!response.ok) throw new Error(json.message ?? "Không thể tải agent run");
-        if (!cancelled) setData(json);
+        if (!cancelled) {
+          setResult({ issueNumber, data: json, error: null });
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Lỗi tải agent run");
-          setData(null);
+          setResult({
+            issueNumber,
+            data: null,
+            error: err instanceof Error ? err.message : "Lỗi tải agent run",
+          });
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -53,6 +55,11 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
   }, [active, issueNumber]);
 
   if (!active) return null;
+
+  const currentResult = result?.issueNumber === issueNumber ? result : null;
+  const data = currentResult?.data ?? null;
+  const error = currentResult?.error ?? null;
+  const loading = currentResult === null;
 
   return (
     <div className="automation-agent-run-panel admin-panel">
