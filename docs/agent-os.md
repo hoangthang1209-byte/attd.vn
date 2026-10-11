@@ -149,7 +149,7 @@ Implementation lives under `src/features/agent-os/`:
 | `cto-action.executor.ts` | Executes allowlisted actions via injected factory deps |
 | `cto-loop.verification.ts` | Requires observable state change; never infers success from submission alone |
 | `cto-loop.dedupe.ts` | Action idempotency keys, BUILD_APPROVED dedupe, no-progress loop detection |
-| `cto-loop.service.ts` | Persists decisions/events; idempotent inbound processing |
+| `cto-loop.service.ts` | Persists decisions/events; idempotent inbound processing; orphaned `g3PendingActionKey` recovery without re-executing external writes |
 | `cto-loop.read.service.ts` | Read-only G3 visibility for admin |
 
 ### Allowed actions (initial G3)

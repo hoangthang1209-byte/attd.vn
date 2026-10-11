@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   buildPostBuildApprovedDedupeKey,
   detectNoProgressLoop,
+  isOrphanedPendingActionSlot,
   shouldSkipDuplicateAction,
   shouldSuppressDuplicateBuildApproved,
   CTO_MAX_NO_PROGRESS_ATTEMPTS,
@@ -60,6 +61,33 @@ describe("CTO loop dedupe", () => {
         proposedActionIdempotencyKey: "cto-g3:assign:1",
       }),
       true,
+    );
+  });
+
+  it("detects orphaned pending slots without a persisted last action key", () => {
+    assert.equal(
+      isOrphanedPendingActionSlot({
+        pendingActionKey: "cto-g3:post-build-approved:1",
+        lastActionKey: null,
+        proposedKey: "cto-g3:post-build-approved:1",
+      }),
+      true,
+    );
+    assert.equal(
+      isOrphanedPendingActionSlot({
+        pendingActionKey: "cto-g3:post-build-approved:1",
+        lastActionKey: "cto-g3:post-build-approved:1",
+        proposedKey: "cto-g3:post-build-approved:1",
+      }),
+      false,
+    );
+    assert.equal(
+      isOrphanedPendingActionSlot({
+        pendingActionKey: "cto-g3:post-build-approved:1",
+        lastActionKey: null,
+        proposedKey: "cto-g3:other",
+      }),
+      false,
     );
   });
 });

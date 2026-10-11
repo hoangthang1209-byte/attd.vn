@@ -5,6 +5,7 @@ import {
   persistCtoLoopStepForIntegrationTests,
   processCtoLoopForTask,
 } from "@/features/agent-os/cto-loop.service";
+import { buildPostBuildApprovedDedupeKey } from "@/features/agent-os/cto-loop.dedupe";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
 import { prisma } from "@/lib/prisma";
 
@@ -16,6 +17,8 @@ const TEST_ISSUE_PERSIST_RECOVERY = 9_001_201;
 const TEST_ISSUE_EXECUTE_RETRY = 9_001_202;
 const TEST_ISSUE_ASSIGN_CONCURRENT = 9_001_203;
 const TEST_ISSUE_FAILED_TERMINAL = 9_001_204;
+const TEST_ISSUE_CANCELLED_TERMINAL = 9_001_205;
+const TEST_ISSUE_ORPHAN_PENDING = 9_001_206;
 
 function taskFixture(
   issueNumber: number,
@@ -86,6 +89,8 @@ after(async () => {
     TEST_ISSUE_EXECUTE_RETRY,
     TEST_ISSUE_ASSIGN_CONCURRENT,
     TEST_ISSUE_FAILED_TERMINAL,
+    TEST_ISSUE_CANCELLED_TERMINAL,
+    TEST_ISSUE_ORPHAN_PENDING,
   ]);
   await prisma.$disconnect();
 });
@@ -328,6 +333,95 @@ describe("processCtoLoopForTask", () => {
       },
     });
     assert.equal(decisions, 1);
+  });
+
+  it("recovers orphaned pending external action via observation without duplicate GitHub write", async () => {
+    let approveCalls = 0;
+    const deps = {
+      postBuildApproved: async (issueNumber: number) => {
+        approveCalls += 1;
+        return { result: "approved_now" as const, issueNumber, message: "ok" };
+      },
+    };
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_PENDING, {
+        status: "building",
+        labels: ["status:building", "risk:low"],
+      }),
+    });
+    const pendingKey = buildPostBuildApprovedDedupeKey({
+      issueNumber: TEST_ISSUE_ORPHAN_PENDING,
+      prNumber: null,
+      prHeadSha: null,
+      reviewState: null,
+      ciStatus: null,
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "POST_BUILD_APPROVED",
+        },
+      },
+    });
+
+    approveCalls = 0;
+
+    const recovered = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_PENDING, {
+        status: "backlog",
+        hasBuildApproved: true,
+        labels: ["status:backlog", "risk:low"],
+      }),
+      deps,
+    });
+
+    assert.equal(approveCalls, 0);
+    assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
+    assert.equal(recovered.execution.submitted, true);
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: bootstrap.agentRunId } });
+    const summary = run.outputSummary as Record<string, unknown>;
+    assert.equal(summary.g3LastActionKey, pendingKey);
+    assert.equal(summary.g3PendingActionKey, undefined);
+
+    const decisions = await prisma.agentDecision.count({
+      where: { agentRunId: bootstrap.agentRunId, selectedAction: "POST_BUILD_APPROVED" },
+    });
+    assert.equal(decisions, 1);
+  });
+
+  it("creates a new CTO attempt after CANCELLED terminal when inbound arrives", async () => {
+    const first = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_CANCELLED_TERMINAL, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: first.agentRunId },
+      data: { status: "CANCELLED", finishedAt: new Date() },
+    });
+
+    const inbound = ingestGitHubIssueStatusEvent({
+      issueNumber: TEST_ISSUE_CANCELLED_TERMINAL,
+      normalizedStatus: "ci_review",
+      eventId: "g3-resume-after-cancelled",
+    });
+
+    const second = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_CANCELLED_TERMINAL, { status: "ci_review" }),
+      inbound,
+    });
+
+    assert.notEqual(second.agentRunId, first.agentRunId);
+    const resumed = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: second.agentRunId },
+    });
+    assert.equal(resumed.parentRunId, first.agentRunId);
+    assert.equal(resumed.attemptNumber, 2);
+    assert.equal(resumed.idempotencyKey, `cto-run:${TEST_ISSUE_CANCELLED_TERMINAL}:2`);
   });
 
   it("creates a new CTO attempt after FAILED terminal when inbound arrives", async () => {

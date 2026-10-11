@@ -56,3 +56,17 @@ export function shouldBlockConcurrentExecution(input: {
   if (!input.hasActiveNonTerminalRun) return false;
   return input.action === "POST_BUILD_APPROVED" || input.action === "REQUEST_CI_RETRY";
 }
+
+/**
+ * Pending slot was claimed but audit persistence never recorded g3LastActionKey
+ * (e.g. worker crash after external submit).
+ */
+export function isOrphanedPendingActionSlot(input: {
+  pendingActionKey: string | null;
+  lastActionKey: string | null;
+  proposedKey: string;
+}): boolean {
+  if (!input.pendingActionKey) return false;
+  if (input.pendingActionKey !== input.proposedKey) return false;
+  return input.lastActionKey !== input.proposedKey;
+}

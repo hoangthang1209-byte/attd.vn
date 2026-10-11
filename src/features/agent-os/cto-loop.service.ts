@@ -7,8 +7,15 @@ import {
   resolveCtoActionExecutorDeps,
   type CtoActionExecutorDeps,
 } from "@/features/agent-os/cto-action.executor";
-import { isCtoExternalWriteAction } from "@/features/agent-os/cto-action.allowlist";
+import {
+  assertCtoAllowedAction,
+  isCtoAllowedAction,
+  isCtoExternalWriteAction,
+  type CtoAllowedAction,
+} from "@/features/agent-os/cto-action.allowlist";
+import { isOrphanedPendingActionSlot } from "@/features/agent-os/cto-loop.dedupe";
 import { planCtoLoopStep } from "@/features/agent-os/cto-loop.engine";
+import { evaluateCtoTaskPriority } from "@/features/agent-os/cto-priority";
 import {
   buildCtoObservationFromTask,
   type BuildCtoObservationOptions,
@@ -19,7 +26,10 @@ import type {
   CtoObservation,
   CtoVerificationOutcome,
 } from "@/features/agent-os/cto-loop.types";
-import { evaluateCtoVerification } from "@/features/agent-os/cto-loop.verification";
+import {
+  buildVerificationExpectation,
+  evaluateCtoVerification,
+} from "@/features/agent-os/cto-loop.verification";
 import {
   applyInboundAgentEvent,
   createAgentRun,
@@ -74,7 +84,51 @@ function outputSummaryWithG3(
 ): AgentRunSummaryJson {
   const merged = { ...parseOutputSummary(previous), ...patch };
   delete merged.g3PendingActionKey;
+  delete merged.g3PendingAction;
   return merged;
+}
+
+function parsePendingAction(summary: AgentRunSummaryJson): CtoAllowedAction | null {
+  const raw = summary.g3PendingAction;
+  if (typeof raw !== "string" || !isCtoAllowedAction(raw)) return null;
+  return raw;
+}
+
+function observationConfirmsSubmittedExternalAction(
+  action: CtoAllowedAction,
+  observation: CtoObservation,
+): boolean {
+  if (action === "POST_BUILD_APPROVED") return observation.hasBuildApproved;
+  return false;
+}
+
+function buildOrphanRecoveryPlan(input: {
+  action: CtoAllowedAction;
+  idempotencyKey: string;
+  observation: CtoObservation;
+}): CtoLoopPlan {
+  const priority = evaluateCtoTaskPriority(input.observation);
+  const action = assertCtoAllowedAction(input.action);
+  let decisionType: CtoLoopPlan["decisionType"] = "OTHER";
+  if (action === "POST_BUILD_APPROVED") decisionType = "APPROVE_BUILD";
+  else if (action === "REQUEST_CI_RETRY") decisionType = "RETRY";
+  else if (action.startsWith("ESCALATE")) decisionType = "ESCALATE";
+  else if (action === "ADVANCE_AFTER_VERIFIED_STATE") decisionType = "COMPLETE";
+  else if (action === "WAIT_HUMAN") decisionType = "BLOCK";
+
+  return {
+    assignedAgentId: "ATTD_CTO",
+    priority,
+    selectedAction: action,
+    idempotencyKey: input.idempotencyKey,
+    escalate: action.startsWith("ESCALATE"),
+    humanApprovalRequired: action.startsWith("ESCALATE") || action === "WAIT_HUMAN",
+    rationale: `Recovered orphaned pending ${action} without re-execution`,
+    verification: buildVerificationExpectation(action),
+    blockerReason: input.observation.blockerReason,
+    nextAction: null,
+    decisionType,
+  };
 }
 
 function isRetryableTxConflict(error: unknown): boolean {
@@ -237,6 +291,7 @@ async function releaseCtoPendingActionKey(agentRunId: string): Promise<void> {
 async function tryClaimCtoActionSlot(input: {
   agentRunId: string;
   idempotencyKey: string;
+  selectedAction: CtoAllowedAction;
 }): Promise<boolean> {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -260,6 +315,7 @@ async function tryClaimCtoActionSlot(input: {
               outputSummary: {
                 ...summary,
                 g3PendingActionKey: input.idempotencyKey,
+                g3PendingAction: input.selectedAction,
               } as Prisma.InputJsonValue,
             },
           });
@@ -500,6 +556,9 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
   const outputSummary = parseOutputSummary(refreshedRun.outputSummary);
   const lastActionKey =
     typeof outputSummary.g3LastActionKey === "string" ? outputSummary.g3LastActionKey : null;
+  const pendingActionKey =
+    typeof outputSummary.g3PendingActionKey === "string" ? outputSummary.g3PendingActionKey : null;
+  const pendingAction = parsePendingAction(outputSummary);
 
   const plan = planCtoLoopStep({
     observation: observationBefore,
@@ -519,8 +578,34 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
 
   let execution: CtoActionExecutionResult;
   let actionSlotClaimed = false;
+  let planForPersist = plan;
 
-  if (plan.selectedAction === "NOOP") {
+  const orphanedPendingSlot =
+    pendingActionKey &&
+    pendingAction &&
+    isOrphanedPendingActionSlot({
+      pendingActionKey,
+      lastActionKey,
+      proposedKey: pendingActionKey,
+    });
+
+  if (orphanedPendingSlot) {
+    const submitted = observationConfirmsSubmittedExternalAction(pendingAction, observationBefore);
+    planForPersist =
+      plan.selectedAction === pendingAction && plan.idempotencyKey === pendingActionKey
+        ? plan
+        : buildOrphanRecoveryPlan({
+            action: pendingAction,
+            idempotencyKey: pendingActionKey,
+            observation: observationBefore,
+          });
+    execution = {
+      action: pendingAction,
+      idempotencyKey: pendingActionKey,
+      submitted,
+      skippedReason: submitted ? "orphaned_pending_recovered" : "orphaned_pending_unconfirmed",
+    };
+  } else if (plan.selectedAction === "NOOP") {
     execution = {
       action: "NOOP",
       idempotencyKey: plan.idempotencyKey,
@@ -531,14 +616,35 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     actionSlotClaimed = await tryClaimCtoActionSlot({
       agentRunId: run.id,
       idempotencyKey: plan.idempotencyKey,
+      selectedAction: plan.selectedAction,
     });
     if (!actionSlotClaimed) {
-      execution = {
-        action: plan.selectedAction,
-        idempotencyKey: plan.idempotencyKey,
-        submitted: false,
-        skippedReason: "concurrent_or_duplicate_action",
-      };
+      const orphanFromClaim =
+        isOrphanedPendingActionSlot({
+          pendingActionKey,
+          lastActionKey,
+          proposedKey: plan.idempotencyKey,
+        }) && pendingAction === plan.selectedAction;
+      if (orphanFromClaim) {
+        const submitted = observationConfirmsSubmittedExternalAction(
+          plan.selectedAction,
+          observationBefore,
+        );
+        planForPersist = plan;
+        execution = {
+          action: plan.selectedAction,
+          idempotencyKey: plan.idempotencyKey,
+          submitted,
+          skippedReason: submitted ? "orphaned_pending_recovered" : "orphaned_pending_unconfirmed",
+        };
+      } else {
+        execution = {
+          action: plan.selectedAction,
+          idempotencyKey: plan.idempotencyKey,
+          submitted: false,
+          skippedReason: "concurrent_or_duplicate_action",
+        };
+      }
     } else {
       try {
         execution = await executeCtoAllowedAction({
@@ -557,8 +663,8 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
   const observationAfter = buildCtoObservationFromTask(afterTask, input.observationOptions);
 
   const verification = evaluateCtoVerification({
-    action: plan.selectedAction,
-    expectation: plan.verification,
+    action: planForPersist.selectedAction,
+    expectation: planForPersist.verification,
     before: observationBefore,
     after: observationAfter,
     executionSubmitted: execution.submitted,
@@ -569,15 +675,16 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     taskRunId,
     issueNumber,
     task: input.task,
-    plan,
+    plan: planForPersist,
     verification,
     executionSubmitted: execution.submitted,
     refreshedRun,
   };
 
+  const orphanRecovered = execution.skippedReason === "orphaned_pending_recovered";
   const shouldPersistDecision =
-    plan.selectedAction !== "NOOP" &&
-    execution.skippedReason !== "concurrent_or_duplicate_action";
+    planForPersist.selectedAction !== "NOOP" &&
+    (orphanRecovered || execution.skippedReason !== "concurrent_or_duplicate_action");
   const shouldPersistDuplicateNoop =
     plan.selectedAction === "NOOP" && (input.duplicateSourceEvent ?? false);
 
@@ -585,7 +692,7 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     try {
       if (
         execution.submitted &&
-        isCtoExternalWriteAction(plan.selectedAction)
+        isCtoExternalWriteAction(planForPersist.selectedAction)
       ) {
         await persistCtoLoopStepMandatory(persistInput, persistStep);
       } else {
@@ -606,7 +713,10 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     verification,
     observationBefore,
     observationAfter,
-    skipped: plan.selectedAction === "NOOP" || execution.skippedReason === "concurrent_or_duplicate_action",
+    skipped:
+      plan.selectedAction === "NOOP" ||
+      execution.skippedReason === "concurrent_or_duplicate_action" ||
+      execution.skippedReason === "orphaned_pending_unconfirmed",
   };
 }
 
