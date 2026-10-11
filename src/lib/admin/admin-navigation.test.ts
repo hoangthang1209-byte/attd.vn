@@ -39,6 +39,7 @@ describe("lean admin navigation", () => {
       adminNavigationSections.map((section) => section.label),
       [
         "BÁN HÀNG",
+        "TĂNG TRƯỞNG",
         "SẢN PHẨM",
         "SẢN XUẤT",
         "KỸ THUẬT",

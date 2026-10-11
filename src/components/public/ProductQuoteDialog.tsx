@@ -13,6 +13,7 @@ import {
   trackPdpQuoteSubmitSuccess,
 } from "@/lib/analytics";
 import { isValidImageSrc } from "@/lib/imagePaths";
+import { getLeadAttributionPayload } from "@/lib/attribution";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
@@ -197,6 +198,7 @@ export default function ProductQuoteDialog({
             quantity: expectedQty.trim() || null,
             note: note.trim() || null,
           },
+          ...getLeadAttributionPayload(),
         }),
       });
 

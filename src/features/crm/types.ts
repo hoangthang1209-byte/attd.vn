@@ -112,6 +112,10 @@ export type CrmLeadRecord = {
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  marketingChannel: string | null;
+  marketingCampaign: string | null;
   referrer: string | null;
   createdAt: string;
   updatedAt: string;
@@ -226,6 +230,8 @@ export type CreateCrmLeadInput = {
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
   referrer?: string | null;
   productInterest?: CreateProductInterestInput | null;
   productInterests?: CreateProductInterestInput[];
