@@ -5,9 +5,10 @@ import {
   matchesAutomationTaskFilters,
 } from "@/features/automation/automation-dashboard.filters";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
+import { withAutomationTaskAgentDefaults } from "@/features/automation/automation-task.test-fixture";
 
 function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
-  return {
+  return withAutomationTaskAgentDefaults({
     issueNumber: 83,
     title: "Automation dashboard task area",
     taskArea: "Automation Platform",
@@ -32,7 +33,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
       checkedAt: "2026-09-21T00:00:00.000Z",
     },
     ...overrides,
-  };
+  });
 }
 
 describe("automation dashboard filters", () => {

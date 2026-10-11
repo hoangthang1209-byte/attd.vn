@@ -33158,6 +33158,49 @@ body:has(.blog-article-page) .floating-contact {
   padding-top: 4px;
 }
 
+/* Agent OS summary (Phase G1) */
+.automation-agent-summary {
+  margin: 0 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.automation-agent-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.automation-agent-summary__card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fff;
+}
+.automation-agent-summary__name {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.automation-agent-summary__id {
+  margin: 0 0 8px;
+  font-size: 11px;
+}
+.automation-agent-summary__counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+}
+.automation-agent-summary__counts dt {
+  margin: 0;
+  color: #6b7280;
+}
+.automation-agent-summary__counts dd {
+  margin: 2px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 /* Automation 7-Lane Control Board */
 .automation-lane-board__incompleteness {
   margin: 0 0 12px;

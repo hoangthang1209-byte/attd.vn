@@ -34,6 +34,8 @@ import {
   AUTOMATION_STATUS_FILTER_OPTIONS,
   AUTOMATION_STATUS_LABELS,
   AUTOMATION_PR_STATE_SUFFIX,
+  AUTOMATION_AGENT_PRIORITY_LABELS,
+  AUTOMATION_AGENT_ROUTING_LABELS,
 } from "@/features/automation/labels";
 import type {
   AutomationDashboardResponse,
@@ -50,6 +52,10 @@ import { formatQuoteDateTime } from "@/features/quotes/format";
 
 const AUTO_REFRESH_INTERVAL_MS = 45_000;
 const AUTO_REFRESH_LABEL = "Tự cập nhật ~45 giây";
+
+function displayTaskArea(task: AutomationTask): string {
+  return task.metadataTaskArea ?? task.taskArea;
+}
 
 type LoadOptions = {
   background?: boolean;
@@ -429,6 +435,48 @@ export default function AutomationDashboardClient() {
                 canScrollToTask={canScrollToLaneTask}
                 onRefresh={handleLaneBackgroundRefresh}
               />
+              {data.agentSummary && data.agentSummary.length > 0 ? (
+                <section className="automation-agent-summary" aria-label="Tổng quan agent">
+                  <h2 className="admin-section-title">Agent OS (G1)</h2>
+                  {data.agentSummary.some((card) => card.isPartial) ||
+                  data.dataCompleteness?.openTasksTruncated ? (
+                    <p className="admin-error automation-lane-board__incompleteness" role="status">
+                      Số liệu agent có thể chưa đầy đủ: danh sách task đang mở bị giới hạn khi tải từ GitHub.
+                    </p>
+                  ) : null}
+                  <div className="automation-agent-summary__grid">
+                    {data.agentSummary.map((card) => (
+                      <article key={card.agentId} className="automation-agent-summary__card">
+                        <h3 className="automation-agent-summary__name">{card.displayName}</h3>
+                        <p className="admin-muted automation-agent-summary__id">{card.agentId}</p>
+                        <dl className="automation-agent-summary__counts">
+                          <div>
+                            <dt>Đang xử lý</dt>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.active}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Bị chặn</dt>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.blocked}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Đang chờ</dt>
+                            <dd title={card.isPartial ? "Số liệu chưa đầy đủ" : undefined}>
+                              {card.counts.queued}
+                              {card.isPartial ? " (một phần)" : ""}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
             </>
           ) : null}
 
@@ -543,7 +591,9 @@ export default function AutomationDashboardClient() {
                   <thead>
                     <tr>
                       <th>Vấn đề</th>
+                      <th>Agent</th>
                       <th>Mảng</th>
+                      <th className="automation-task-table__optional">Ưu tiên</th>
                       <th>Tiêu đề</th>
                       <th>Trạng thái</th>
                       <th className="automation-task-table__optional">Rủi ro</th>
@@ -666,7 +716,28 @@ function AutomationTaskDetails({
   return (
     <div className="admin-panel automation-task-card__details">
       <p>
-        <strong>Mảng:</strong> {task.taskArea}
+        <strong>Agent:</strong> {task.agentAssignment.agentDisplayName} ({task.agentAssignment.agentId})
+        {task.agentAssignment.requiresHumanEscalation ? " · Cần leo thang con người" : ""}
+        {task.agentAssignment.agentOverrideAreaMismatch
+          ? " · ATTD_AGENT không khớp mảng được phép"
+          : ""}
+        {" · "}
+        {AUTOMATION_AGENT_ROUTING_LABELS[task.agentAssignment.routingReason]}
+      </p>
+      <p>
+        <strong>Mảng:</strong> {displayTaskArea(task)}
+        {task.metadataTaskArea && task.metadataTaskArea !== task.taskArea ? (
+          <> · TASK_AREA: {task.taskArea}</>
+        ) : null}
+      </p>
+      <p>
+        <strong>Ưu tiên:</strong> {AUTOMATION_AGENT_PRIORITY_LABELS[task.taskPriority]}
+        {task.parentTaskIssueNumber ? (
+          <>
+            {" "}
+            · <strong>Task cha:</strong> #{task.parentTaskIssueNumber}
+          </>
+        ) : null}
       </p>
       <p>
         <strong>Production:</strong>{" "}
@@ -754,7 +825,9 @@ function AutomationTaskCard({
         </span>
       </div>
       <p className="automation-task-card__area">
-        <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
+        <span className="admin-status-badge admin-status-badge--info">{task.agentAssignment.agentDisplayName}</span>
+        {" "}
+        <span className="admin-status-badge admin-status-badge--neutral">{displayTaskArea(task)}</span>
       </p>
       <p className="automation-task-card__title">
         <strong>{task.title}</strong>
@@ -803,9 +876,21 @@ function AutomationTaskRow({
             #{task.issueNumber}
           </Link>
         </td>
-        <td className="sales-follow-up__area-cell" title={task.taskArea}>
-          <span className="admin-status-badge admin-status-badge--neutral">{task.taskArea}</span>
+        <td title={task.agentAssignment.agentId}>
+          <span
+            className={`admin-status-badge${
+              task.agentAssignment.requiresHumanEscalation
+                ? " admin-status-badge--warning"
+                : " admin-status-badge--info"
+            }`}
+          >
+            {task.agentAssignment.agentDisplayName}
+          </span>
         </td>
+        <td className="sales-follow-up__area-cell" title={displayTaskArea(task)}>
+          <span className="admin-status-badge admin-status-badge--neutral">{displayTaskArea(task)}</span>
+        </td>
+        <td>{AUTOMATION_AGENT_PRIORITY_LABELS[task.taskPriority]}</td>
         <td className="sales-follow-up__title-cell">
           <strong>{task.title}</strong>
         </td>
@@ -851,7 +936,7 @@ function AutomationTaskRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={10}>
+          <td colSpan={12}>
             <AutomationTaskDetails task={task} productionCommitSha={productionCommitSha} />
           </td>
         </tr>

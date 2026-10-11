@@ -5,9 +5,10 @@ import {
   evaluateApproveBuildEligibilityForIssue,
 } from "@/features/automation/automation-approve-build.eligibility";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
+import { withAutomationTaskAgentDefaults } from "@/features/automation/automation-task.test-fixture";
 
 function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
-  return {
+  return withAutomationTaskAgentDefaults({
     issueNumber: 116,
     title: "Automation approve build",
     taskArea: "Automation Platform",
@@ -32,7 +33,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
       checkedAt: "2026-09-23T00:00:00.000Z",
     },
     ...overrides,
-  };
+  });
 }
 
 describe("approve build eligibility", () => {

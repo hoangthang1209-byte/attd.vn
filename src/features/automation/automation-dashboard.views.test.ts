@@ -9,9 +9,10 @@ import {
 } from "@/features/automation/automation-dashboard.views";
 import { createInitialProductionStatus } from "@/features/automation/automation-production";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
+import { withAutomationTaskAgentDefaults } from "@/features/automation/automation-task.test-fixture";
 
 function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
-  return {
+  return withAutomationTaskAgentDefaults({
     issueNumber: 57,
     title: "Historical merged task",
     taskArea: "Automation Platform",
@@ -31,7 +32,7 @@ function taskFixture(overrides: Partial<AutomationTask> = {}): AutomationTask {
     hasBuildApproved: false,
     productionStatus: createInitialProductionStatus("2026-08-01T00:00:00.000Z"),
     ...overrides,
-  };
+  });
 }
 
 describe("parseAutomationDashboardView", () => {

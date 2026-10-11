@@ -8,6 +8,7 @@ GitHub is the source of truth. The dashboard consumes Phase F1 task status label
 
 - `docs/github-task-status.md`
 - `docs/github-build-orchestrator.md`
+- `docs/agent-os.md` (Phase G1 agent registry, metadata, and routing on this dashboard)
 
 No database models or write actions are used.
 

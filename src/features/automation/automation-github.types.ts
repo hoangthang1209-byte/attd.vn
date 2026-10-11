@@ -11,6 +11,8 @@ export type GitHubIssueComment = {
 export type GitHubIssuePayload = {
   number: number;
   title: string;
+  /** Issue body when loaded from GitHub (null when not available). */
+  body: string | null;
   state: "OPEN" | "CLOSED";
   url: string;
   updatedAt: string;
