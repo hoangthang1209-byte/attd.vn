@@ -132,7 +132,51 @@ Pure normalizers in `src/features/agent-os/agent-event.ingestion.ts` for GitHub 
 
 Migration `0099_agent_os_g2_persistence` is additive only (new enums/tables). Rollback: drop the four tables and enums in reverse order on a non-production database; no backfill required.
 
+## Phase G3 — Autonomous CTO event loop
+
+G3 adds a **server-side CTO orchestration loop** on top of G1 routing and G2 persistence. GitHub remains the engineering source of truth; the loop consumes normalized task/PR/CI/reviewer/deploy observations and advances durable `AgentRun` / `TaskRun` state through:
+
+**observe → prioritize → assign → execute → verify → escalate**
+
+Implementation lives under `src/features/agent-os/`:
+
+| Module | Role |
+| --- | --- |
+| `cto-loop.observe.ts` | Build normalized `CtoObservation` from automation tasks + G1 router |
+| `cto-priority.ts` | Deterministic priority evaluator (`ATTD_PRIORITY`, risk, blockers, dependencies, staleness tie-break) |
+| `cto-loop.engine.ts` | Pure planner — selects allowlisted action + escalation |
+| `cto-action.allowlist.ts` | Typed action allowlist (no shell/process spawning) |
+| `cto-action.executor.ts` | Executes allowlisted actions via injected factory deps |
+| `cto-loop.verification.ts` | Requires observable state change; never infers success from submission alone |
+| `cto-loop.dedupe.ts` | Action idempotency keys, BUILD_APPROVED dedupe, no-progress loop detection |
+| `cto-loop.service.ts` | Persists decisions/events; idempotent inbound processing |
+| `cto-loop.read.service.ts` | Read-only G3 visibility for admin |
+
+### Allowed actions (initial G3)
+
+- `ASSIGN_AGENT` — **phase-1 persistence only**: records G1 routing on the CTO run (`outputSummary.g3AssignedAgent`); does not spawn a specialist `AgentRun` yet (G4)
+- `WAIT_EXTERNAL` / `WAIT_HUMAN` — pipeline or human blockers
+- `POST_BUILD_APPROVED` — **only** through existing `approveBuildForIssue` eligibility + idempotency guards (`processCtoLoopForTask` wires this by default; tests may inject mocks)
+- `REQUEST_CI_RETRY` — **phase-1 persistence only**: records orchestrator retry intent on the CTO run; does not enqueue CI/orchestrator jobs yet (follow-up wiring)
+- `ESCALATE_HIGH_RISK` / `ESCALATE_NO_PROGRESS` — human approval required
+- `ADVANCE_AFTER_VERIFIED_STATE` — close loop after verified post-merge/deploy signals
+- `NOOP` / `RECORD_DECISION`
+
+High-risk domains always plan `ESCALATE_HIGH_RISK` (ATTD_CTO + human approval). G3 does **not** bypass CI, independent review, merge gates, deployment health checks, or `BUILD_APPROVED` authorization.
+
+### Admin visibility
+
+`/admin/automation` task detail panels load:
+
+- G2 history: `GET /api/admin/automation/agent-runs?issueNumber=…`
+- G3 CTO loop snapshot: `GET /api/admin/automation/cto-loop?issueNumber=…`
+
+Same `dashboard.view` permission as the automation dashboard. Read-only.
+
+### Rollback / forward-fix
+
+G3 is code-only (no new migrations). Disable by not invoking `processCtoLoopForTask` from pollers/webhooks. Existing G2 rows remain auditable; clearing G3 `outputSummary` keys is optional and non-destructive.
+
 ## Future phases
 
-- **G3:** CTO event loop with safe automatic assignment and guarded actions.
 - **G4:** Specialist agents + QA / deployment / reliability closed loop.
