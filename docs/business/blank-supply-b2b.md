@@ -1,5 +1,11 @@
 # ATTD Blank Supply B2B — Business & UX Architecture
 
+Related:
+- GitHub issue #189
+- \`AGENTS.md\`
+- \`docs/decisions/ADR-0003-domain-boundaries.md\`
+- \`docs/quotation/README.md\`
+
 ## Positioning
 ATTD Blank Supply is the B2B source for standardized blank apparel that buyers can print, resell, or reuse across recurring projects.
 
@@ -18,11 +24,12 @@ ATTD Blank Supply is the B2B source for standardized blank apparel that buyers c
 1. Choose product family: T-shirt / Polo / Oversize / Hoodie-Sweatshirt / future blank accessories
 2. Compare commercial attributes: form, fabric, GSM, colors, sizes
 3. Understand supply: MOQ, price-from, availability / lead time
-4. Choose action:
+4. Enter required quantity or select the relevant quantity tier through one canonical quantity pattern shared by all commercial actions
+5. Choose action:
    - Xem giá sỉ
    - Kiểm tra tồn kho
    - Lấy mẫu
-5. Optional add-ons after blank selection:
+6. Optional add-ons after blank selection:
    - Printing
    - Embroidery
    - Packaging
@@ -45,6 +52,8 @@ Every blank-product card should prioritize:
 - Supply status / lead time where reliable
 - Primary CTA: **Xem giá sỉ**
 
+When stock or lead-time data is unavailable or stale, use the explicit fallback **Liên hệ kiểm tra tồn kho**; do not imply live availability.
+
 Secondary entry: **Xem chi tiết**.
 
 ## PDP requirements
@@ -62,6 +71,8 @@ Primary CTA stack:
 1. **Xem giá sỉ**
 2. **Kiểm tra tồn kho**
 3. **Lấy mẫu**
+
+All three actions must reuse the same quantity input/tier pattern instead of creating separate quantity flows.
 
 ## Conversion rules
 - Do not force project-service language onto blank buyers.
@@ -93,6 +104,13 @@ CTA: **Xem nguồn áo trơn**
 - One-click / rapid reorder
 - Quote-to-CRM linkage
 - Purchase history and recurring recommendations
+
+## Implementation constraints
+- Follow \`AGENTS.md\` and \`docs/decisions/ADR-0003-domain-boundaries.md\` before implementation.
+- Reuse the existing Pricing Engine; do not introduce parallel price, VAT, cost, discount, or margin formulas.
+- Reuse existing quotation and CRM services and the patterns documented in \`docs/quotation/README.md\`; do not create a duplicate quote-to-CRM pipeline.
+- Treat dealer-account, tiered-pricing, stock-write, quotation, CRM, auth, and permission changes as separate implementation scopes with their required review and human approval gates.
+- Phase 1 public conversion work must not silently implement Phase 2 pricing, account, inventory-write, or CRM behavior.
 
 ## Success criteria
 - A buyer reaches a relevant blank product in 2–3 steps.
