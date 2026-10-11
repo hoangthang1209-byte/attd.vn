@@ -33201,6 +33201,20 @@ body:has(.blog-article-page) .floating-contact {
   font-weight: 600;
 }
 
+.automation-agent-run-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+.automation-agent-run-panel__list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.automation-agent-run-panel__item {
+  margin-bottom: 6px;
+}
+
 /* Automation 7-Lane Control Board */
 .automation-lane-board__incompleteness {
   margin: 0 0 12px;
