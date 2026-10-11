@@ -5,7 +5,10 @@ import {
   persistCtoLoopStepForIntegrationTests,
   processCtoLoopForTask,
 } from "@/features/agent-os/cto-loop.service";
-import { buildPostBuildApprovedDedupeKey } from "@/features/agent-os/cto-loop.dedupe";
+import {
+  buildCtoActionIdempotencyKey,
+  buildPostBuildApprovedDedupeKey,
+} from "@/features/agent-os/cto-loop.dedupe";
 import type { AutomationTask } from "@/features/automation/automation-task.types";
 import { prisma } from "@/lib/prisma";
 
@@ -97,6 +100,7 @@ after(async () => {
     TEST_ISSUE_ORPHAN_LEGACY_KEY,
     TEST_ISSUE_ORPHAN_MISATTRIBUTION,
     TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND,
+    TEST_ISSUE_ORPHAN_PENDING + 50,
   ]);
   await prisma.$disconnect();
 });
@@ -534,6 +538,8 @@ describe("processCtoLoopForTask", () => {
     assert.equal(approveCalls, 0);
     assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
     assert.equal(recovered.execution.submitted, true);
+    assert.equal(recovered.plan.selectedAction, "POST_BUILD_APPROVED");
+    assert.equal(recovered.plan.idempotencyKey, pendingKey);
 
     const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: bootstrap.agentRunId } });
     const summary = run.outputSummary as Record<string, unknown>;
@@ -544,6 +550,98 @@ describe("processCtoLoopForTask", () => {
       where: { agentRunId: bootstrap.agentRunId, selectedAction: "POST_BUILD_APPROVED" },
     });
     assert.equal(decisions, 1);
+  });
+
+  it("returns persisted orphan escalation plan instead of pre-orphan planner plan", async () => {
+    const pendingKey = buildPostBuildApprovedDedupeKey({
+      issueNumber: TEST_ISSUE_ORPHAN_MISATTRIBUTION,
+      prNumber: 99,
+      prHeadSha: "abc123456789",
+      reviewState: "approved",
+      ciStatus: "success",
+    });
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_MISATTRIBUTION, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "POST_BUILD_APPROVED",
+        },
+      },
+    });
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_ORPHAN_MISATTRIBUTION, {
+        hasBuildApproved: true,
+        linkedPullRequest: {
+          number: 99,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/99",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha: "deadbeef00000000000000000000000000000000",
+          verification: { reviewStatus: "approved", ciStatus: "success" },
+        },
+      }),
+    });
+
+    assert.equal(result.execution.skippedReason, "orphaned_pending_unconfirmed");
+    assert.equal(result.plan.selectedAction, "POST_BUILD_APPROVED");
+    assert.equal(result.plan.idempotencyKey, pendingKey);
+  });
+
+  it("recovers CI retry orphan when CI leaves failure on matching PR head", async () => {
+    const issueNumber = TEST_ISSUE_ORPHAN_PENDING + 50;
+    const mergeCommitSha = "abc1234567890123456789012345678901234567890";
+    const headFingerprint = mergeCommitSha.slice(0, 12);
+    const pendingKey = buildCtoActionIdempotencyKey([
+      "ci-retry",
+      String(issueNumber),
+      "pr-12",
+      headFingerprint,
+    ]);
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, { status: "ci_review" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "REQUEST_CI_RETRY",
+        },
+      },
+    });
+
+    const recovered = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "pending", ciStatus: "pending" },
+        },
+      }),
+    });
+
+    assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
+    assert.equal(recovered.plan.selectedAction, "REQUEST_CI_RETRY");
+    assert.equal(recovered.plan.idempotencyKey, pendingKey);
   });
 
   it("creates a new CTO attempt after CANCELLED terminal when inbound arrives", async () => {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildCtoActionIdempotencyKey,
   buildPostBuildApprovedDedupeKey,
   derivePendingActionFromIdempotencyKey,
   detectNoProgressLoop,
@@ -78,6 +79,15 @@ describe("CTO loop dedupe", () => {
       storedPendingAction: null,
     });
     assert.deepEqual(derived, { kind: "resolved", action: "POST_BUILD_APPROVED" });
+  });
+
+  it("marks stored pending action mismatch against key segment as ambiguous", () => {
+    const key = buildCtoActionIdempotencyKey(["ci-retry", "10", "pr-2", "abc123"]);
+    const derived = derivePendingActionFromIdempotencyKey({
+      pendingActionKey: key,
+      storedPendingAction: "POST_BUILD_APPROVED",
+    });
+    assert.deepEqual(derived, { kind: "ambiguous" });
   });
 
   it("marks unknown pending key formats as ambiguous", () => {

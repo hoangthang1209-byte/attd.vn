@@ -876,7 +876,7 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
 
   return {
     agentRunId: run.id,
-    plan,
+    plan: planForPersist,
     execution,
     verification,
     observationBefore,

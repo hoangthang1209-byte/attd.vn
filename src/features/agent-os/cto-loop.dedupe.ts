@@ -13,28 +13,37 @@ export type DerivedPendingActionResult =
 /**
  * Legacy rows may only persist g3PendingActionKey. Derive the action when the key format is unambiguous.
  */
+function resolveActionFromIdempotencyKeySegment(actionSegment: string): CtoAllowedAction | null {
+  if (actionSegment === "post-build-approved") {
+    return "POST_BUILD_APPROVED";
+  }
+  if (actionSegment === "ci-retry") {
+    return "REQUEST_CI_RETRY";
+  }
+  return null;
+}
+
 export function derivePendingActionFromIdempotencyKey(input: {
   pendingActionKey: string;
   storedPendingAction: CtoAllowedAction | null;
 }): DerivedPendingActionResult {
-  if (input.storedPendingAction) {
-    return { kind: "resolved", action: input.storedPendingAction };
-  }
-
   const segments = input.pendingActionKey.split(":");
   if (segments[0] !== "cto-g3" || segments.length < 2) {
     return { kind: "ambiguous" };
   }
 
-  const actionSegment = segments[1];
-  if (actionSegment === "post-build-approved") {
-    return { kind: "resolved", action: "POST_BUILD_APPROVED" };
-  }
-  if (actionSegment === "ci-retry") {
-    return { kind: "resolved", action: "REQUEST_CI_RETRY" };
+  const actionFromKey = resolveActionFromIdempotencyKeySegment(segments[1] ?? "");
+  if (input.storedPendingAction) {
+    if (!actionFromKey || actionFromKey !== input.storedPendingAction) {
+      return { kind: "ambiguous" };
+    }
+    return { kind: "resolved", action: input.storedPendingAction };
   }
 
-  return { kind: "ambiguous" };
+  if (!actionFromKey) {
+    return { kind: "ambiguous" };
+  }
+  return { kind: "resolved", action: actionFromKey };
 }
 
 export function buildCtoActionIdempotencyKey(parts: readonly string[]): string {
