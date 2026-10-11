@@ -633,18 +633,24 @@ export default function CostingCalculator() {
         )}
         {error && <p className="admin-error">{error}</p>}
 
-        <section className="costing-section">
+        <section className="costing-section costing-setup">
           <div className="costing-section__head">
-            <h2 className="costing-section__title">Thông tin tính giá</h2>
+            <div>
+              <h2 className="costing-section__title">Đơn hàng & giá bán</h2>
+              <p className="admin-field-hint costing-setup__subtitle">
+                Chọn sản phẩm, số lượng và chốt giá. BOM sẽ tự nạp khi sản phẩm đã có định mức.
+              </p>
+            </div>
             <button
               type="button"
               className="admin-btn admin-btn--secondary admin-btn--small"
               onClick={() => setQuickStartOpen(true)}
             >
-              Bắt đầu nhanh từ mẫu
+              Dùng mẫu
             </button>
           </div>
-          <div className="admin-seo-brief-form-grid">
+
+          <div className="costing-context-grid">
             <div className="admin-field">
               <label className="admin-label">Khách hàng</label>
               <select
@@ -659,9 +665,7 @@ export default function CostingCalculator() {
                     return;
                   }
                   const selected = customers.find((row) => row.id === nextId);
-                  setCustomerPrefillLabel(
-                    selected ? `${selected.name} (${selected.code})` : null,
-                  );
+                  setCustomerPrefillLabel(selected ? `${selected.name} (${selected.code})` : null);
                 }}
               >
                 <option value="">— Không chọn —</option>
@@ -672,6 +676,7 @@ export default function CostingCalculator() {
                 ))}
               </select>
             </div>
+
             <div className="admin-field">
               <label className="admin-label">Sản phẩm</label>
               <select
@@ -691,36 +696,40 @@ export default function CostingCalculator() {
                 ))}
               </select>
             </div>
-            <div className="admin-field">
-              <label className="admin-label">Biến thể</label>
-              <select
-                className="admin-input"
-                value={variantId}
-                onChange={(e) => {
-                  const nextVariantId = e.target.value;
-                  setVariantId(nextVariantId);
-                  if (productId) void loadProductBom(productId, nextVariantId);
-                }}
-                disabled={!productId}
-              >
-                <option value="">— Không chọn —</option>
-                {(variantsMap[productId] ?? []).map((variant) => (
-                  <option key={variant.id} value={variant.id}>
-                    {variant.sku} {variant.colorName} {variant.sizeName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Tên sản phẩm tùy chỉnh</label>
-              <input
-                className="admin-input"
-                value={customProductName}
-                onChange={(e) => setCustomProductName(e.target.value)}
-                placeholder="VD: Sleeveless Top, Tour Hoodie..."
-              />
-            </div>
-            <div className="admin-field">
+
+            {productId ? (
+              <div className="admin-field">
+                <label className="admin-label">Biến thể</label>
+                <select
+                  className="admin-input"
+                  value={variantId}
+                  onChange={(e) => {
+                    const nextVariantId = e.target.value;
+                    setVariantId(nextVariantId);
+                    void loadProductBom(productId, nextVariantId);
+                  }}
+                >
+                  <option value="">— Không chọn —</option>
+                  {(variantsMap[productId] ?? []).map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      {variant.sku} {variant.colorName} {variant.sizeName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="admin-field">
+                <label className="admin-label">Tên sản phẩm</label>
+                <input
+                  className="admin-input"
+                  value={customProductName}
+                  onChange={(e) => setCustomProductName(e.target.value)}
+                  placeholder="VD: Hoodie half-zip..."
+                />
+              </div>
+            )}
+
+            <div className="admin-field costing-context-grid__quantity">
               <label className="admin-label">Số lượng</label>
               <input
                 className="admin-input"
@@ -730,76 +739,84 @@ export default function CostingCalculator() {
                 onChange={(e) => setQuantity(e.target.value)}
               />
             </div>
-            <div className="admin-field">
-              <label className="admin-label">Đơn vị</label>
+
+            <div className="admin-field costing-context-grid__unit">
+              <label className="admin-label">ĐVT</label>
               <input className="admin-input" value={unit} onChange={(e) => setUnit(e.target.value)} />
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Biên lợi nhuận mục tiêu (%)</label>
-              <input
-                className="admin-input"
-                type="number"
-                min="0"
-                max="99"
-                value={targetMarginRate}
-                onChange={(e) => setTargetMarginRate(e.target.value)}
-              />
-              <p className="admin-field-hint">
-                Biên lợi nhuận trên doanh thu, không phải cộng % trực tiếp vào giá vốn.
-              </p>
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Lợi nhuận / SP</label>
-              <input
-                className="admin-input"
-                type="number"
-                min="0"
-                value={Math.max(0, Math.round(livePreview.suggestedSellingPricePerUnit - livePreview.totalCostPerUnit))}
-                onChange={(e) => {
-                  const profit = Math.max(0, Number(e.target.value) || 0);
-                  const selling = livePreview.totalCostPerUnit + profit;
-                  setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
-                }}
-              />
-              <p className="admin-field-hint">Có thể nhập trực tiếp mức lời mong muốn như cách tính Excel hiện tại.</p>
-            </div>
-            <div className="admin-field">
-              <label className="admin-label">Giá bán / SP</label>
-              <input
-                className="admin-input"
-                type="number"
-                min={Math.max(0, livePreview.totalCostPerUnit)}
-                value={Math.round(livePreview.suggestedSellingPricePerUnit)}
-                onChange={(e) => {
-                  const selling = Math.max(livePreview.totalCostPerUnit, Number(e.target.value) || 0);
-                  setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
-                }}
-              />
-              <p className="admin-field-hint">Nhập giá bán để hệ thống tự quy đổi về margin tương ứng.</p>
             </div>
           </div>
 
           {productId && (
-            <div className="costing-bom-status" style={{ marginTop: 12 }}>
+            <div className="costing-bom-status">
               <button
                 type="button"
-                className="admin-btn admin-btn--secondary admin-btn--small"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
                 disabled={loadingProductBom}
                 onClick={() => void loadProductBom(productId, variantId)}
               >
-                {loadingProductBom ? "Đang nạp BOM…" : "Nạp lại BOM nguyên phụ liệu"}
+                {loadingProductBom ? "Đang nạp BOM…" : "↻ Nạp lại BOM"}
               </button>
               {productBomWarnings.length > 0 && (
-                <ul className="admin-kb-warning-list" style={{ marginTop: 8 }}>
+                <ul className="admin-kb-warning-list">
                   {productBomWarnings.map((warning) => <li key={warning}>{warning}</li>)}
                 </ul>
               )}
             </div>
           )}
 
-          <details className="costing-details">
-            <summary>Thông tin bổ sung (lead, liên hệ)</summary>
-            <div className="admin-seo-brief-form-grid" style={{ marginTop: 12 }}>
+          <div className="costing-commercial-strip">
+            <div className="costing-commercial-strip__head">
+              <strong>Chốt giá</strong>
+              <span>Giá vốn hiện tại: {formatPricingCurrency(livePreview.totalCostPerUnit)} / SP</span>
+            </div>
+            <div className="costing-commercial-grid">
+              <div className="admin-field">
+                <label className="admin-label">Margin %</label>
+                <input
+                  className="admin-input"
+                  type="number"
+                  min="0"
+                  max="99"
+                  value={targetMarginRate}
+                  onChange={(e) => setTargetMarginRate(e.target.value)}
+                />
+              </div>
+              <div className="admin-field">
+                <label className="admin-label">Lãi / SP (đ)</label>
+                <input
+                  className="admin-input"
+                  type="number"
+                  min="0"
+                  value={Math.max(0, Math.round(livePreview.suggestedSellingPricePerUnit - livePreview.totalCostPerUnit))}
+                  onChange={(e) => {
+                    const profit = Math.max(0, Number(e.target.value) || 0);
+                    const selling = livePreview.totalCostPerUnit + profit;
+                    setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
+                  }}
+                />
+              </div>
+              <div className="admin-field costing-commercial-grid__selling">
+                <label className="admin-label">Giá bán / SP (đ)</label>
+                <input
+                  className="admin-input"
+                  type="number"
+                  min={Math.max(0, livePreview.totalCostPerUnit)}
+                  value={Math.round(livePreview.suggestedSellingPricePerUnit)}
+                  onChange={(e) => {
+                    const selling = Math.max(livePreview.totalCostPerUnit, Number(e.target.value) || 0);
+                    setTargetMarginRate(String(marginFromSellingPrice(livePreview.totalCostPerUnit, selling)));
+                  }}
+                />
+              </div>
+            </div>
+            <p className="admin-field-hint costing-commercial-strip__hint">
+              Nhập một trong ba cách chốt giá; hệ thống tự quy đổi các giá trị còn lại.
+            </p>
+          </div>
+
+          <details className="costing-details costing-details--inline">
+            <summary>Thông tin bổ sung</summary>
+            <div className="costing-context-grid costing-context-grid--secondary">
               <div className="admin-field">
                 <label className="admin-label">Lead</label>
                 <select className="admin-input" value={leadId} onChange={(e) => setLeadId(e.target.value)}>

@@ -12,6 +12,7 @@ export default function CostingSummaryPanel({ preview, officialResult }: Props) 
   const display = officialResult ?? preview;
   const isLive = !officialResult;
   const otherCost = display.otherCostPerUnit ?? 0;
+  const profitPerUnit = Math.max(0, display.suggestedSellingPricePerUnit - display.totalCostPerUnit);
 
   return (
     <aside className="costing-summary-panel">
@@ -21,53 +22,61 @@ export default function CostingSummaryPanel({ preview, officialResult }: Props) 
           {isLive && <span className="costing-summary-panel__badge">Ước tính</span>}
         </div>
 
-        <dl className="costing-summary-panel__metrics">
+        <div className="costing-summary-panel__primary">
+          <div>
+            <span>Giá vốn / SP</span>
+            <strong>{formatPricingCurrency(display.totalCostPerUnit)}</strong>
+          </div>
+          <div>
+            <span>Giá bán / SP</span>
+            <strong>{formatPricingCurrency(display.suggestedSellingPricePerUnit)}</strong>
+          </div>
+          <div>
+            <span>Lãi / SP</span>
+            <strong>{formatPricingCurrency(profitPerUnit)}</strong>
+          </div>
+        </div>
+
+        <dl className="costing-summary-panel__metrics costing-summary-panel__metrics--compact">
           <div className="costing-summary-panel__metric">
-            <dt>Nguyên phụ liệu / SP</dt>
-            <dd>{formatPricingCurrency(display.materialCostPerUnit)}</dd>
+            <dt>Margin</dt>
+            <dd>{formatPricingPercent(display.actualMarginRate)}</dd>
           </div>
           <div className="costing-summary-panel__metric">
-            <dt>Gia công / SP</dt>
-            <dd>{formatPricingCurrency(display.processCostPerUnit)}</dd>
-          </div>
-          <div className="costing-summary-panel__metric">
-            <dt>Chi phí khác / SP</dt>
-            <dd>{formatPricingCurrency(otherCost)}</dd>
-          </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--cost">
-            <dt>Giá vốn / SP</dt>
-            <dd>{formatPricingCurrency(display.totalCostPerUnit)}</dd>
-          </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--cost">
-            <dt>Tổng giá vốn</dt>
-            <dd>{formatPricingCurrency(display.totalCost)}</dd>
-          </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--sell">
-            <dt>Giá bán đề xuất / SP</dt>
-            <dd>{formatPricingCurrency(display.suggestedSellingPricePerUnit)}</dd>
-          </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--sell">
-            <dt>Doanh thu dự kiến</dt>
+            <dt>Doanh thu</dt>
             <dd>{formatPricingCurrency(display.revenueBeforeVat)}</dd>
           </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--margin">
+          <div className="costing-summary-panel__metric">
             <dt>Lợi nhuận gộp</dt>
             <dd>{formatPricingCurrency(display.grossProfit)}</dd>
           </div>
-          <div className="costing-summary-panel__metric costing-summary-panel__metric--margin">
-            <dt>Margin %</dt>
-            <dd>{formatPricingPercent(display.actualMarginRate)}</dd>
-          </div>
         </dl>
 
-        <p className="admin-field-hint costing-summary-panel__target">
-          Target margin: {formatPricingPercent(display.targetMarginRate)}
-        </p>
+        <details className="costing-summary-panel__breakdown">
+          <summary>Cơ cấu giá vốn</summary>
+          <dl className="costing-summary-panel__metrics">
+            <div className="costing-summary-panel__metric">
+              <dt>Nguyên phụ liệu / SP</dt>
+              <dd>{formatPricingCurrency(display.materialCostPerUnit)}</dd>
+            </div>
+            <div className="costing-summary-panel__metric">
+              <dt>Gia công / SP</dt>
+              <dd>{formatPricingCurrency(display.processCostPerUnit)}</dd>
+            </div>
+            <div className="costing-summary-panel__metric">
+              <dt>Chi phí khác / SP</dt>
+              <dd>{formatPricingCurrency(otherCost)}</dd>
+            </div>
+            <div className="costing-summary-panel__metric">
+              <dt>Tổng giá vốn</dt>
+              <dd>{formatPricingCurrency(display.totalCost)}</dd>
+            </div>
+          </dl>
+        </details>
 
         {display.vatRate > 0 && (
-          <p className="admin-field-hint">
-            VAT {formatPricingPercent(display.vatRate)} · Giá báo cuối{" "}
-            {formatPricingCurrency(display.finalQuotePrice)}
+          <p className="admin-field-hint costing-summary-panel__target">
+            VAT {formatPricingPercent(display.vatRate)} · Giá báo cuối {formatPricingCurrency(display.finalQuotePrice)}
           </p>
         )}
 
