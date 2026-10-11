@@ -6482,7 +6482,7 @@ model AgentEvent {
   agentRunId     String
   taskRunId      String?
   source         AgentEventSource
-  idempotencyKey String           @unique
+  idempotencyKey String
   payloadSummary Json?
   appliedAt      DateTime         @default(now())
   createdAt      DateTime         @default(now())
@@ -6490,6 +6490,7 @@ model AgentEvent {
   agentRun AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
   taskRun  TaskRun?  @relation(fields: [taskRunId], references: [id], onDelete: SetNull)
 
+  @@unique([agentRunId, idempotencyKey])
   @@index([agentRunId, appliedAt])
   @@index([source])
 }
