@@ -1,10 +1,21 @@
 import { assertCtoAllowedAction } from "@/features/agent-os/cto-action.allowlist";
 import type { CtoActionExecutionResult, CtoLoopPlan, CtoObservation } from "@/features/agent-os/cto-loop.types";
-import type { ApproveBuildResponse } from "@/features/automation/automation-approve-build.service";
+import {
+  approveBuildForIssue,
+  type ApproveBuildResponse,
+} from "@/features/automation/automation-approve-build.service";
 
 export type CtoActionExecutorDeps = {
   postBuildApproved: (issueNumber: number) => Promise<ApproveBuildResponse>;
 };
+
+/** Server default wires POST_BUILD_APPROVED through the existing factory gate; tests may inject doubles. */
+export function resolveCtoActionExecutorDeps(deps?: CtoActionExecutorDeps): CtoActionExecutorDeps {
+  if (deps) return deps;
+  return {
+    postBuildApproved: async (issueNumber) => approveBuildForIssue(String(issueNumber)),
+  };
+}
 
 export async function executeCtoAllowedAction(input: {
   plan: CtoLoopPlan;

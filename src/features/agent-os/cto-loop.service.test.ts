@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 
 const TEST_ISSUE_IDEMPOTENT = 9_001_197;
 const TEST_ISSUE_HIGH_RISK = 9_001_198;
+const TEST_ISSUE_TERMINAL = 9_001_199;
+const TEST_ISSUE_CONCURRENT = 9_001_200;
 
 function taskFixture(
   issueNumber: number,
@@ -68,7 +70,12 @@ async function cleanupIssues(issueNumbers: number[]) {
 }
 
 after(async () => {
-  await cleanupIssues([TEST_ISSUE_IDEMPOTENT, TEST_ISSUE_HIGH_RISK]);
+  await cleanupIssues([
+    TEST_ISSUE_IDEMPOTENT,
+    TEST_ISSUE_HIGH_RISK,
+    TEST_ISSUE_TERMINAL,
+    TEST_ISSUE_CONCURRENT,
+  ]);
   await prisma.$disconnect();
 });
 
@@ -115,5 +122,97 @@ describe("processCtoLoopForTask", () => {
       where: { githubIssueNumber: TEST_ISSUE_HIGH_RISK, agentId: "ATTD_CTO" },
     });
     assert.equal(run.humanApprovalRequired, true);
+  });
+
+  it("does not mutate terminal CTO runs without a new inbound event", async () => {
+    const first = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: first.agentRunId },
+      data: { status: "SUCCEEDED", finishedAt: new Date("2026-01-02T00:00:00.000Z") },
+    });
+
+    const terminalBefore = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: first.agentRunId },
+    });
+
+    const idle = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL, { status: "building" }),
+    });
+
+    assert.equal(idle.skipped, true);
+    assert.equal(idle.execution.skippedReason, "terminal_run_idle");
+
+    const terminalAfter = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: first.agentRunId },
+    });
+    assert.equal(terminalAfter.status, "SUCCEEDED");
+    assert.equal(
+      terminalAfter.finishedAt?.toISOString(),
+      terminalBefore.finishedAt?.toISOString(),
+    );
+
+    const runCount = await prisma.agentRun.count({
+      where: { githubIssueNumber: TEST_ISSUE_TERMINAL, agentId: "ATTD_CTO" },
+    });
+    assert.equal(runCount, 1);
+  });
+
+  it("creates a new CTO attempt after terminal when inbound arrives", async () => {
+    const first = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL, { status: "building" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: first.agentRunId },
+      data: { status: "SUCCEEDED", finishedAt: new Date() },
+    });
+
+    const inbound = ingestGitHubIssueStatusEvent({
+      issueNumber: TEST_ISSUE_TERMINAL,
+      normalizedStatus: "ci_review",
+      eventId: "g3-resume-after-terminal",
+    });
+
+    const second = await processCtoLoopForTask({
+      task: taskFixture(TEST_ISSUE_TERMINAL, { status: "ci_review" }),
+      inbound,
+    });
+
+    assert.notEqual(second.agentRunId, first.agentRunId);
+
+    const resumed = await prisma.agentRun.findUniqueOrThrow({
+      where: { id: second.agentRunId },
+    });
+    assert.equal(resumed.parentRunId, first.agentRunId);
+    assert.equal(resumed.attemptNumber, 2);
+  });
+
+  it("prevents concurrent external-write double execution for the same action key", async () => {
+    let approveCalls = 0;
+    const deps = {
+      postBuildApproved: async (issueNumber: number) => {
+        approveCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return { result: "approved_now" as const, issueNumber, message: "ok" };
+      },
+    };
+
+    const task = taskFixture(TEST_ISSUE_CONCURRENT, {
+      status: "backlog",
+      hasBuildApproved: false,
+      labels: ["status:backlog", "risk:low"],
+    });
+
+    const [a, b] = await Promise.all([
+      processCtoLoopForTask({ task, deps }),
+      processCtoLoopForTask({ task, deps }),
+    ]);
+
+    const submittedCount = [a, b].filter((r) => r.execution.submitted).length;
+    assert.equal(submittedCount, 1);
+    assert.ok(approveCalls <= 1);
   });
 });

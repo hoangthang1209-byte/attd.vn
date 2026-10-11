@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { executeCtoAllowedAction } from "@/features/agent-os/cto-action.executor";
+import {
+  executeCtoAllowedAction,
+  resolveCtoActionExecutorDeps,
+} from "@/features/agent-os/cto-action.executor";
 import type { CtoLoopPlan, CtoObservation } from "@/features/agent-os/cto-loop.types";
 import type { AgentRouteResult } from "@/features/agent-os/agent.types";
 
@@ -55,6 +58,18 @@ function plan(action: CtoLoopPlan["selectedAction"]): CtoLoopPlan {
     decisionType: "OTHER",
   };
 }
+
+describe("resolveCtoActionExecutorDeps", () => {
+  it("returns injected deps when provided", () => {
+    const custom = { postBuildApproved: async () => ({ result: "already_approved" as const, issueNumber: 1, message: "" }) };
+    assert.equal(resolveCtoActionExecutorDeps(custom), custom);
+  });
+
+  it("provides default postBuildApproved wiring when omitted", () => {
+    const resolved = resolveCtoActionExecutorDeps();
+    assert.equal(typeof resolved.postBuildApproved, "function");
+  });
+});
 
 describe("executeCtoAllowedAction", () => {
   it("does not call GitHub when deps missing for POST_BUILD_APPROVED", async () => {
