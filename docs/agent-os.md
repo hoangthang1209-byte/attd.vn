@@ -173,6 +173,18 @@ High-risk domains always plan `ESCALATE_HIGH_RISK` (ATTD_CTO + human approval). 
 
 Same `dashboard.view` permission as the automation dashboard. Read-only.
 
+G2 agent-run history and G3 CTO loop snapshots load independently in the admin panel: a G3 API failure shows an inline muted warning and must not hide G2 run history.
+
+### Operations — legacy CI-retry pending slots
+
+G3 production poller/webhook invocation is not enabled by default. If a row still has `g3PendingActionKey` for `REQUEST_CI_RETRY` from before baseline persistence shipped, orphan recovery stays `orphaned_pending_unconfirmed` until ops clears or re-issues the action:
+
+1. Confirm PR/issue/head on the pending key still matches the live task.
+2. If CI already reflects the desired state, clear the pending slot via the documented manual recovery path (do not re-post BUILD_APPROVED or duplicate external writes).
+3. If a retry is still required, let the orchestrator re-claim with a fresh idempotency key so `g3CiRetryBaselineCiStatus` is stored.
+
+New claims always persist failure/unknown baseline before treating `pending` or `success` as positive retry attribution.
+
 ### Rollback / forward-fix
 
 G3 is code-only (no new migrations). Disable by not invoking `processCtoLoopForTask` from pollers/webhooks. Existing G2 rows remain auditable; clearing G3 `outputSummary` keys is optional and non-destructive.
