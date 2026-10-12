@@ -280,6 +280,37 @@ export async function recordAgentDecision(input: RecordAgentDecisionInput) {
   });
 }
 
+export async function createAgentRunAfterTerminal(input: {
+  priorRunId: string;
+  triggerSource: AgentEventSource;
+  idempotencyKey: string;
+}) {
+  const prior = await prisma.agentRun.findUniqueOrThrow({ where: { id: input.priorRunId } });
+  if (!isTerminalAgentRunStatus(prior.status)) {
+    throw new Error("New attempt requires a terminal prior run");
+  }
+
+  const existing = await prisma.agentRun.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+  });
+  if (existing) return existing;
+
+  const correlationId = prior.correlationId ?? prior.id;
+  const nextAttempt = prior.attemptNumber + 1;
+
+  return createAgentRun({
+    agentId: prior.agentId,
+    triggerSource: input.triggerSource,
+    githubIssueNumber: prior.githubIssueNumber,
+    correlationId,
+    parentRunId: prior.id,
+    idempotencyKey: input.idempotencyKey,
+    attemptNumber: nextAttempt,
+    inputSummary: (prior.inputSummary as AgentRunSummaryJson | null) ?? undefined,
+    humanApprovalRequired: prior.humanApprovalRequired,
+  });
+}
+
 export async function retryAgentRun(input: {
   failedRunId: string;
   triggerSource: AgentEventSource;
@@ -290,24 +321,10 @@ export async function retryAgentRun(input: {
     throw new Error("Retry requires a failed or cancelled terminal run");
   }
 
-  const existing = await prisma.agentRun.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-  });
-  if (existing) return existing;
-
-  const correlationId = failed.correlationId ?? failed.id;
-  const nextAttempt = failed.attemptNumber + 1;
-
-  return createAgentRun({
-    agentId: failed.agentId,
+  return createAgentRunAfterTerminal({
+    priorRunId: failed.id,
     triggerSource: input.triggerSource,
-    githubIssueNumber: failed.githubIssueNumber,
-    correlationId,
-    parentRunId: failed.id,
     idempotencyKey: input.idempotencyKey,
-    attemptNumber: nextAttempt,
-    inputSummary: (failed.inputSummary as AgentRunSummaryJson | null) ?? undefined,
-    humanApprovalRequired: failed.humanApprovalRequired,
   });
 }
 
