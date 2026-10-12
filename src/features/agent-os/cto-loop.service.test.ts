@@ -27,6 +27,7 @@ const TEST_ISSUE_ORPHAN_PENDING = 9_001_206;
 const TEST_ISSUE_ORPHAN_LEGACY_KEY = 9_001_207;
 const TEST_ISSUE_ORPHAN_MISATTRIBUTION = 9_001_208;
 const TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND = 9_001_209;
+const TEST_ISSUE_ORPHAN_AMBIGUOUS = 9_001_210;
 
 function taskFixture(
   issueNumber: number,
@@ -107,6 +108,7 @@ after(async () => {
     TEST_ISSUE_ORPHAN_PENDING + 52,
     TEST_ISSUE_ORPHAN_PENDING + 53,
     TEST_ISSUE_ORPHAN_PENDING + 54,
+    TEST_ISSUE_ORPHAN_AMBIGUOUS,
   ]);
   await prisma.$disconnect();
 });
@@ -863,6 +865,78 @@ describe("processCtoLoopForTask", () => {
 
     assert.equal(result.plan.selectedAction, "REQUEST_CI_RETRY");
     assert.equal(baselineAtPersistClaim, "failure");
+  });
+
+  it("escalates to WAIT_HUMAN when CI-retry pending key disagrees with stored POST_BUILD_APPROVED action", async () => {
+    let approveCalls = 0;
+    const issueNumber = TEST_ISSUE_ORPHAN_AMBIGUOUS;
+    const mergeCommitSha = "ddd4445556667778889990001112223334445556";
+    const headFingerprint = mergeCommitSha.slice(0, 12);
+    const pendingKey = buildCtoActionIdempotencyKey([
+      "ci-retry",
+      String(issueNumber),
+      "pr-12",
+      headFingerprint,
+    ]);
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, { status: "ci_review" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "POST_BUILD_APPROVED",
+        },
+      },
+    });
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        hasBuildApproved: true,
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "approved", ciStatus: "success" },
+        },
+      }),
+      deps: {
+        postBuildApproved: async () => {
+          approveCalls += 1;
+          return { result: "approved_now" as const, issueNumber, message: "ok" };
+        },
+      },
+    });
+
+    assert.equal(result.plan.selectedAction, "WAIT_HUMAN");
+    assert.equal(result.execution.action, "WAIT_HUMAN");
+    assert.equal(result.execution.skippedReason, "orphaned_pending_ambiguous");
+    assert.equal(result.execution.submitted, false);
+    assert.equal(approveCalls, 0);
+
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: bootstrap.agentRunId } });
+    const summary = run.outputSummary as Record<string, unknown>;
+    assert.equal(summary.g3PendingActionKey, undefined);
+    assert.equal(summary.g3PendingAction, undefined);
+
+    const decisions = await prisma.agentDecision.findMany({
+      where: { agentRunId: bootstrap.agentRunId },
+      orderBy: { createdAt: "asc" },
+    });
+    const waitHumanDecision = decisions.find((row) => row.selectedAction === "WAIT_HUMAN");
+    assert.ok(waitHumanDecision);
+    const evidence = waitHumanDecision?.evidenceRefs as Array<{ type: string; ref: string }>;
+    const manual = evidence?.find((entry) => entry.type === "manual");
+    assert.ok(manual?.ref.includes("orphaned_pending_ambiguous"));
   });
 
   it("creates a new CTO attempt after CANCELLED terminal when inbound arrives", async () => {
