@@ -326,6 +326,9 @@ export async function countNoProgressAttempts(issueNumber: number): Promise<numb
     if (verified) break;
 
     const recovery = evidenceRecoveryMarker(row.evidenceRefs);
+    if (recovery === "orphaned_pending_recovered") {
+      break;
+    }
     const action = row.selectedAction;
     const countsAsNoProgress =
       recovery === "orphaned_pending_unconfirmed" ||
@@ -843,13 +846,21 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
   const afterTask = input.taskAfterExecution ?? input.task;
   const observationAfter = buildCtoObservationFromTask(afterTask, input.observationOptions);
 
-  const verification = evaluateCtoVerification({
+  const orphanRecovered = execution.skippedReason === "orphaned_pending_recovered";
+  const orphanAmbiguous = execution.skippedReason === "orphaned_pending_ambiguous";
+  const orphanEscalated = execution.skippedReason === "orphan_unconfirmed_escalated";
+
+  let verification = evaluateCtoVerification({
     action: planForPersist.selectedAction,
     expectation: planForPersist.verification,
     before: observationBefore,
     after: observationAfter,
     executionSubmitted: execution.submitted,
   });
+
+  if (orphanRecovered && execution.submitted) {
+    verification = "verified";
+  }
 
   const persistInput: PersistCtoStepInput = {
     agentRunId: run.id,
@@ -864,9 +875,6 @@ export async function processCtoLoopForTask(input: ProcessCtoLoopInput): Promise
     refreshedRun,
   };
 
-  const orphanRecovered = execution.skippedReason === "orphaned_pending_recovered";
-  const orphanAmbiguous = execution.skippedReason === "orphaned_pending_ambiguous";
-  const orphanEscalated = execution.skippedReason === "orphan_unconfirmed_escalated";
   const shouldPersistDecision =
     planForPersist.selectedAction !== "NOOP" &&
     (orphanRecovered ||

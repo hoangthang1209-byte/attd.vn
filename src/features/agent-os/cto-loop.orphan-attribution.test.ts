@@ -179,7 +179,7 @@ describe("observationConfirmsPendingExternalAction", () => {
     );
   });
 
-  it("confirms CI retry when CI is pending on matching head", () => {
+  it("confirms CI retry when CI is pending after a recorded failure baseline", () => {
     const pendingKey = buildCtoActionIdempotencyKey(["ci-retry", "42", "pr-7", "abc123456789"]);
     const observation = observationFixture({
       status: "ci_review",
@@ -196,8 +196,52 @@ describe("observationConfirmsPendingExternalAction", () => {
         action: "REQUEST_CI_RETRY",
         pendingIdempotencyKey: pendingKey,
         observation,
+        ciRetryBaselineCiStatus: "failure",
       }),
       true,
+    );
+  });
+
+  it("does not confirm CI retry when CI was already pending before claim (no baseline)", () => {
+    const pendingKey = buildCtoActionIdempotencyKey(["ci-retry", "42", "pr-7", "abc123456789"]);
+    const observation = observationFixture({
+      pullRequest: {
+        number: 7,
+        headShaFingerprint: "abc123456789",
+        verification: { reviewStatus: "pending", ciStatus: "pending" },
+        merged: false,
+      },
+    });
+
+    assert.equal(
+      observationConfirmsPendingExternalAction({
+        action: "REQUEST_CI_RETRY",
+        pendingIdempotencyKey: pendingKey,
+        observation,
+      }),
+      false,
+    );
+  });
+
+  it("does not confirm CI retry when CI is pending but baseline was already success", () => {
+    const pendingKey = buildCtoActionIdempotencyKey(["ci-retry", "42", "pr-7", "abc123456789"]);
+    const observation = observationFixture({
+      pullRequest: {
+        number: 7,
+        headShaFingerprint: "abc123456789",
+        verification: { reviewStatus: "pending", ciStatus: "pending" },
+        merged: false,
+      },
+    });
+
+    assert.equal(
+      observationConfirmsPendingExternalAction({
+        action: "REQUEST_CI_RETRY",
+        pendingIdempotencyKey: pendingKey,
+        observation,
+        ciRetryBaselineCiStatus: "success",
+      }),
+      false,
     );
   });
 

@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { ingestGitHubIssueStatusEvent } from "@/features/agent-os/agent-event.ingestion";
 import {
+  countNoProgressAttempts,
   persistCtoLoopStepForIntegrationTests,
   processCtoLoopForTask,
 } from "@/features/agent-os/cto-loop.service";
+import { G3_CI_RETRY_BASELINE_CI_STATUS_KEY } from "@/features/agent-os/cto-loop.orphan-attribution";
 import {
   buildCtoActionIdempotencyKey,
   buildPostBuildApprovedDedupeKey,
@@ -101,6 +103,10 @@ after(async () => {
     TEST_ISSUE_ORPHAN_MISATTRIBUTION,
     TEST_ISSUE_ORPHAN_UNCONFIRMED_BOUND,
     TEST_ISSUE_ORPHAN_PENDING + 50,
+    TEST_ISSUE_ORPHAN_PENDING + 51,
+    TEST_ISSUE_ORPHAN_PENDING + 52,
+    TEST_ISSUE_ORPHAN_PENDING + 53,
+    TEST_ISSUE_ORPHAN_PENDING + 54,
   ]);
   await prisma.$disconnect();
 });
@@ -690,6 +696,173 @@ describe("processCtoLoopForTask", () => {
     assert.equal(result.execution.skippedReason, "orphaned_pending_unconfirmed");
     assert.equal(result.plan.selectedAction, "REQUEST_CI_RETRY");
     assert.equal(result.plan.idempotencyKey, pendingKey);
+  });
+
+  it("does not recover CI retry orphan when CI was already pending without baseline", async () => {
+    const issueNumber = TEST_ISSUE_ORPHAN_PENDING + 52;
+    const mergeCommitSha = "aaa1112223334445556667778889990001112223";
+    const headFingerprint = mergeCommitSha.slice(0, 12);
+    const pendingKey = buildCtoActionIdempotencyKey([
+      "ci-retry",
+      String(issueNumber),
+      "pr-12",
+      headFingerprint,
+    ]);
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, { status: "ci_review" }),
+    });
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "REQUEST_CI_RETRY",
+        },
+      },
+    });
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "pending", ciStatus: "pending" },
+        },
+      }),
+    });
+
+    assert.equal(result.execution.skippedReason, "orphaned_pending_unconfirmed");
+  });
+
+  it("attributed CI retry orphan recovery does not advance no-progress toward ESCALATE_NO_PROGRESS", async () => {
+    const issueNumber = TEST_ISSUE_ORPHAN_PENDING + 53;
+    const mergeCommitSha = "bbb2223334445556667778889990001112223334";
+    const headFingerprint = mergeCommitSha.slice(0, 12);
+    const pendingKey = buildCtoActionIdempotencyKey([
+      "ci-retry",
+      String(issueNumber),
+      "pr-12",
+      headFingerprint,
+    ]);
+
+    const bootstrap = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, { status: "ci_review" }),
+    });
+
+    for (let i = 0; i < 2; i += 1) {
+      await prisma.agentDecision.create({
+        data: {
+          agentRunId: bootstrap.agentRunId,
+          decisionType: "RETRY",
+          rationaleSummary: "seed unverified retry",
+          selectedAction: "REQUEST_CI_RETRY",
+          evidenceRefs: [
+            {
+              type: "manual",
+              ref: JSON.stringify({
+                priority: "test",
+                verified: "pending",
+                idempotencyKey: `seed-retry-${i}`,
+              }),
+            },
+          ],
+        },
+      });
+    }
+
+    await prisma.agentRun.update({
+      where: { id: bootstrap.agentRunId },
+      data: {
+        outputSummary: {
+          g3PendingActionKey: pendingKey,
+          g3PendingAction: "REQUEST_CI_RETRY",
+          [G3_CI_RETRY_BASELINE_CI_STATUS_KEY]: "failure",
+        },
+      },
+    });
+
+    const recovered = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "pending", ciStatus: "pending" },
+        },
+      }),
+    });
+
+    assert.equal(recovered.execution.skippedReason, "orphaned_pending_recovered");
+    assert.equal(recovered.verification, "verified");
+    assert.equal(await countNoProgressAttempts(issueNumber), 0);
+
+    const afterRecovery = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "pending", ciStatus: "pending" },
+        },
+      }),
+    });
+
+    assert.notEqual(afterRecovery.plan.selectedAction, "ESCALATE_NO_PROGRESS");
+  });
+
+  it("persists g3CiRetryBaselineCiStatus when claiming a REQUEST_CI_RETRY action slot", async () => {
+    const issueNumber = TEST_ISSUE_ORPHAN_PENDING + 54;
+    const mergeCommitSha = "ccc3334445556667778889990001112223334445";
+    let baselineAtPersistClaim: unknown;
+
+    const result = await processCtoLoopForTask({
+      task: taskFixture(issueNumber, {
+        status: "ci_review",
+        hasBuildApproved: true,
+        labels: ["status:ci_review", "risk:low"],
+        linkedPullRequest: {
+          number: 12,
+          title: "test",
+          url: "https://github.com/hoangthang1209-byte/attd.vn/pull/12",
+          state: "open",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+          mergedAt: null,
+          merged: false,
+          mergeCommitSha,
+          verification: { reviewStatus: "pending", ciStatus: "failure" },
+        },
+      }),
+      persistStepOverride: async (input) => {
+        const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: input.agentRunId } });
+        const summary = run.outputSummary as Record<string, unknown>;
+        baselineAtPersistClaim = summary[G3_CI_RETRY_BASELINE_CI_STATUS_KEY];
+        await persistCtoLoopStepForIntegrationTests(input);
+      },
+    });
+
+    assert.equal(result.plan.selectedAction, "REQUEST_CI_RETRY");
+    assert.equal(baselineAtPersistClaim, "failure");
   });
 
   it("creates a new CTO attempt after CANCELLED terminal when inbound arrives", async () => {

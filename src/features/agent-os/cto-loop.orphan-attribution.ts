@@ -86,15 +86,14 @@ function observationConfirmsCiRetry(input: {
     return false;
   }
   const ciStatus = input.observation.pullRequest?.verification?.ciStatus ?? null;
-  if (ciStatus === "pending") {
-    return true;
-  }
-  if (ciStatus !== "success") {
-    return false;
-  }
-
   const baseline = input.ciRetryBaselineCiStatus;
   if (baseline == null) {
+    return false;
+  }
+  if (ciStatus === "pending") {
+    return baseline === "failure" || baseline === "unknown";
+  }
+  if (ciStatus !== "success") {
     return false;
   }
   return baseline === "failure" || baseline === "unknown";
