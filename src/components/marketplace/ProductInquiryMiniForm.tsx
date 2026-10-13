@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
+import { getLeadAttributionPayload } from "@/lib/attribution";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
@@ -53,6 +54,7 @@ export default function ProductInquiryMiniForm({
           name: name.trim(),
           phone: phone.trim(),
           message: messageParts.join("\n") || null,
+          ...getLeadAttributionPayload(),
         }),
       });
 

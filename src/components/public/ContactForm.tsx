@@ -10,6 +10,7 @@ import {
 import { CTA } from "@/lib/ctaConfig";
 import { TRUST_REASSURANCE_PRIVACY } from "@/lib/b2b-trust-v2-copy";
 import { ButtonLoading } from "@/components/ui/loading/ContextLoading";
+import { getLeadAttributionPayload } from "@/lib/attribution";
 
 type FormStatus = "idle" | "loading" | "success" | "error";
 
@@ -72,7 +73,15 @@ export default function ContactForm() {
       const response = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, email, company, message, sourceDetail }),
+        body: JSON.stringify({
+          name,
+          phone,
+          email,
+          company,
+          message,
+          sourceDetail,
+          ...getLeadAttributionPayload(),
+        }),
       });
 
       const data = await response.json();

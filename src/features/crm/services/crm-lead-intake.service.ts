@@ -8,6 +8,7 @@ import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-prod
 import { getCrmLeadById } from "@/features/crm/services/crm-lead.service";
 import { autoAssignLead } from "@/features/crm/services/crm-lead-assignment.service";
 import type { CreateCrmLeadInput, CreateProductInterestInput, CrmLeadRecord } from "@/features/crm/types";
+import { buildPersistedLeadAttribution } from "@/features/growth/lead-attribution-persistence";
 
 const ACTIVE_STATUSES = ["NEW","CONTACTED","QUALIFIED","NEED_PRICING","QUOTING","QUOTED","NEGOTIATING"] as const;
 
@@ -113,10 +114,42 @@ async function appendInboundToLead(
   preparedInterests: Array<{ interest: CreateProductInterestInput; snapshot: string | null }>,
 ) {
   const keys = identityKeys(phoneNormalized, emailNormalized);
+  const existingLead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: {
+      utmSource: true,
+      utmMedium: true,
+      utmCampaign: true,
+      utmTerm: true,
+      utmContent: true,
+      referrer: true,
+      landingPage: true,
+      marketingChannel: true,
+      marketingCampaign: true,
+      source: true,
+    },
+  });
+  const attribution = buildPersistedLeadAttribution(input.lead, {
+    intakeChannel: input.channel,
+    existing: existingLead ?? undefined,
+  });
   await prisma.$transaction(async (tx) => {
     await tx.lead.update({
       where: { id: leadId },
-      data: { phoneNormalized, emailNormalized, lastInboundAt: new Date() },
+      data: {
+        phoneNormalized,
+        emailNormalized,
+        lastInboundAt: new Date(),
+        utmSource: attribution.utmSource,
+        utmMedium: attribution.utmMedium,
+        utmCampaign: attribution.utmCampaign,
+        utmTerm: attribution.utmTerm,
+        utmContent: attribution.utmContent,
+        referrer: attribution.referrer,
+        landingPage: attribution.landingPage,
+        marketingChannel: attribution.marketingChannel,
+        marketingCampaign: attribution.marketingCampaign,
+      },
     });
     for (const key of keys) {
       await tx.leadIdentityKey.upsert({
@@ -256,6 +289,7 @@ export async function ingestCrmLead(input: {
   }
 
   const code = await generateLeadCode();
+  const attribution = buildPersistedLeadAttribution(input.lead, { intakeChannel: input.channel });
   try {
     const leadId = await prisma.$transaction(async (tx) => {
       const row = await tx.lead.create({
@@ -282,11 +316,15 @@ export async function ingestCrmLead(input: {
           followUpAt: null,
           estimatedValue: input.lead.estimatedValue ?? null,
           assignedTo: input.lead.assignedTo?.trim() || null,
-          landingPage: input.lead.landingPage?.trim() || null,
-          utmSource: input.lead.utmSource?.trim() || null,
-          utmMedium: input.lead.utmMedium?.trim() || null,
-          utmCampaign: input.lead.utmCampaign?.trim() || null,
-          referrer: input.lead.referrer?.trim() || null,
+          landingPage: attribution.landingPage,
+          utmSource: attribution.utmSource,
+          utmMedium: attribution.utmMedium,
+          utmCampaign: attribution.utmCampaign,
+          utmTerm: attribution.utmTerm,
+          utmContent: attribution.utmContent,
+          referrer: attribution.referrer,
+          marketingChannel: attribution.marketingChannel,
+          marketingCampaign: attribution.marketingCampaign,
           lastInboundAt: new Date(),
         },
       });

@@ -64,6 +64,14 @@ export async function POST(request: Request) {
     typeof body.sourceDetail === "string" ? body.sourceDetail.trim().slice(0, 255) || null : null;
   const inquiry = body.productInquiry as ProductInquiryBody | undefined;
 
+  const utmSource = typeof body.utmSource === "string" ? body.utmSource.trim() || null : null;
+  const utmMedium = typeof body.utmMedium === "string" ? body.utmMedium.trim() || null : null;
+  const utmCampaign = typeof body.utmCampaign === "string" ? body.utmCampaign.trim() || null : null;
+  const utmTerm = typeof body.utmTerm === "string" ? body.utmTerm.trim() || null : null;
+  const utmContent = typeof body.utmContent === "string" ? body.utmContent.trim() || null : null;
+  const referrer = typeof body.referrer === "string" ? body.referrer.trim() || null : null;
+  const landingPage = typeof body.landingPage === "string" ? body.landingPage.trim() || null : null;
+
   const source = inquiry?.productId ? "PRODUCT_INQUIRY" : "CONTACT";
   const leadInput = {
     fullName,
@@ -73,6 +81,13 @@ export async function POST(request: Request) {
     source,
     sourceDetail: inquiry?.productUrl?.trim() || sourceDetailInput,
     message,
+    utmSource,
+    utmMedium,
+    utmCampaign,
+    utmTerm,
+    utmContent,
+    referrer,
+    landingPage,
     ...(inquiry?.productId
       ? {
           productInterest: {
