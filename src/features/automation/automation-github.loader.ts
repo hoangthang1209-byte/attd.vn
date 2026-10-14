@@ -186,6 +186,12 @@ type GitHubCommitStatusResponse = {
 type GitHubPullReviewResponse = {
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
   submitted_at: string;
+  commit_id?: string | null;
+  body?: string | null;
+};
+
+type GitHubPullCommentResponse = {
+  body: string;
 };
 
 export type SearchIssuesPaginatedResult = {
@@ -825,16 +831,52 @@ function mapCombinedStatusState(state: GitHubCommitStatusResponse["state"]): Pul
   }
 }
 
-function mapPullReviewState(reviews: GitHubPullReviewResponse[]): PullRequestVerificationReviewStatus {
-  const meaningfulReviews = reviews
-    .filter((review) => review.state === "APPROVED" || review.state === "CHANGES_REQUESTED")
-    .sort((left, right) => Date.parse(right.submitted_at) - Date.parse(left.submitted_at));
+function mapPullReviewState(
+  headSha: string,
+  reviews: GitHubPullReviewResponse[],
+): {
+  reviewStatus: PullRequestVerificationReviewStatus;
+  reviewedHeadSha: string | null;
+} {
+  const snapshots = reviews.map((review) => ({
+    commitId: review.commit_id?.trim() || null,
+    body: review.body ?? "",
+    state: review.state,
+  }));
 
-  if (meaningfulReviews.length === 0) {
-    return reviews.length > 0 ? "pending" : "unknown";
+  // Lazy import avoided — inline exact-head gate to keep loader dependency-free at module init.
+  const exactReview = snapshots.find(
+    (review) =>
+      review.commitId === headSha &&
+      review.body.includes("CURSOR_AUTOMATION_ID:") &&
+      review.body.includes("Independent ATTD PR Review"),
+  );
+
+  if (exactReview) {
+    return {
+      reviewStatus:
+        exactReview.state === "CHANGES_REQUESTED" ? "changes_requested" : "approved",
+      reviewedHeadSha: exactReview.commitId,
+    };
   }
 
-  return meaningfulReviews[0]?.state === "CHANGES_REQUESTED" ? "changes_requested" : "approved";
+  const hasStaleIndependentReview = snapshots.some(
+    (review) =>
+      review.commitId &&
+      review.commitId !== headSha &&
+      review.body.includes("CURSOR_AUTOMATION_ID:") &&
+      review.body.includes("Independent ATTD PR Review"),
+  );
+
+  if (hasStaleIndependentReview) {
+    return { reviewStatus: "stale", reviewedHeadSha: null };
+  }
+
+  if (reviews.length > 0) {
+    return { reviewStatus: "pending", reviewedHeadSha: null };
+  }
+
+  return { reviewStatus: "unknown", reviewedHeadSha: null };
 }
 
 export async function fetchPullRequestVerificationSafe(
@@ -851,18 +893,39 @@ export async function fetchPullRequestVerificationSafe(
     );
 
     const headSha = pull.head.sha;
-    const [combinedStatus, reviews] = await Promise.all([
+    const [combinedStatus, reviews, comments] = await Promise.all([
       githubRequest<GitHubCommitStatusResponse>(
         `/repos/${config.owner}/${config.repo}/commits/${headSha}/status`,
       ),
       githubRequest<GitHubPullReviewResponse[]>(
         `/repos/${config.owner}/${config.repo}/pulls/${pullNumber}/reviews`,
       ),
+      githubRequest<GitHubPullCommentResponse[]>(
+        `/repos/${config.owner}/${config.repo}/issues/${pullNumber}/comments?per_page=100`,
+      ),
     ]);
+
+    const reviewGate = mapPullReviewState(headSha, reviews);
+    const commentBodies = comments.map((comment) => comment.body);
+    const stalledMarker = `REVIEW_ORCHESTRATOR_IDEMPOTENCY: stalled-pr-${pullNumber}-sha-${headSha}`;
+    const stalledComment = commentBodies.find(
+      (body) =>
+        body.includes("REVIEW_ORCHESTRATOR_STALLED:") && body.includes(stalledMarker),
+    );
+    const stalledReason =
+      stalledComment
+        ?.split("\n")
+        .find((line) => line.startsWith("REVIEW_ORCHESTRATOR_STALLED:"))
+        ?.trim() ?? null;
 
     return {
       ciStatus: mapCombinedStatusState(combinedStatus.state),
-      reviewStatus: mapPullReviewState(reviews),
+      reviewStatus: reviewGate.reviewStatus,
+      headSha,
+      reviewedHeadSha: reviewGate.reviewedHeadSha,
+      reviewStalled: Boolean(stalledComment),
+      waitHuman: Boolean(stalledComment),
+      reviewStalledReason: stalledReason,
     };
   } catch (error) {
     if (isRecoverableGitHubLookupError(error)) {

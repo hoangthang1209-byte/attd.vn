@@ -234,6 +234,13 @@ export function selectLaneRepresentativeTask(tasksInLane: AutomationTask[]): Aut
 export function mapLaneOverallState(task: AutomationTask | null): AutomationLaneOverallState {
   if (!task) return "chua_co_task";
 
+  if (
+    task.linkedPullRequest?.verification?.reviewStalled ||
+    task.linkedPullRequest?.verification?.waitHuman
+  ) {
+    return "blocked";
+  }
+
   if (task.status === "stalled" || task.status === "failed" || task.status === "blocked") {
     return "blocked";
   }
@@ -302,8 +309,15 @@ export function deriveLaneNextAction(
 
   switch (overallState) {
     case "blocked": {
+      const reviewStalledReason = task.linkedPullRequest?.verification?.reviewStalledReason?.trim();
+      if (reviewStalledReason && reviewStalledReason.length <= 48) {
+        return "WAIT_HUMAN · review_stalled";
+      }
       const reason = task.blockerReason?.trim();
       if (reason && reason.length <= 48) return reason;
+      if (task.linkedPullRequest?.verification?.waitHuman) {
+        return "WAIT_HUMAN · review_stalled";
+      }
       return "Xử lý blocker";
     }
     case "can_sua":

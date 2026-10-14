@@ -1,0 +1,39 @@
+name: Review Orchestrator — CI Success
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: review-orchestrator-ci-pr-${{ github.event.workflow_run.pull_requests[0].number }}-sha-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  request-exact-head-review:
+    name: Request exact-head independent review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'pull_request'
+          && github.event.workflow_run.pull_requests[0] != null }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Orchestrate independent review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+          PULL_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          source .github/scripts/review-orchestrator-common.sh
+          handle_exact_head_review_orchestration "$PULL_NUMBER" "$HEAD_SHA" "ci-success"

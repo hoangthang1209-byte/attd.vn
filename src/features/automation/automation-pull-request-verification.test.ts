@@ -50,6 +50,17 @@ describe("automation pull request verification display", () => {
     assert.equal(display, "CI ✅ · Review ⏳");
   });
 
+  it("shows WAIT_HUMAN when review orchestrator stalled on exact head", () => {
+    const display = formatPullRequestVerificationDisplay({
+      ciStatus: "success",
+      reviewStatus: "pending",
+      reviewStalled: true,
+      waitHuman: true,
+      reviewStalledReason: "REVIEW_ORCHESTRATOR_STALLED: timeout",
+    });
+    assert.match(display ?? "", /WAIT_HUMAN/);
+  });
+
   it("derives Public UI #96/#98 verify/reviewer truth when checks are green", () => {
     const display = derivePullRequestVerificationDisplay({
       status: "pr_open",
