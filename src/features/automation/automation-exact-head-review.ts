@@ -1,3 +1,5 @@
+import { isAttdReviewBlockedByP0P1 } from "@/features/automation/automation-pr-review-severity";
+
 export const REQUEST_INDEPENDENT_REVIEW_TOKEN = "REQUEST_INDEPENDENT_REVIEW";
 export const REVIEW_ORCHESTRATOR_MARKER_PREFIX = "REVIEW_ORCHESTRATOR_IDEMPOTENCY:";
 export const REVIEW_ORCHESTRATOR_STALLED_PREFIX = "REVIEW_ORCHESTRATOR_STALLED:";
@@ -41,7 +43,10 @@ export function resolveExactHeadReviewGate(input: {
 } {
   const exactReview = findExactHeadIndependentReview(input.headSha, input.reviews);
   if (exactReview) {
-    if (exactReview.state === "CHANGES_REQUESTED") {
+    if (
+      exactReview.state === "CHANGES_REQUESTED" ||
+      isAttdReviewBlockedByP0P1(exactReview.body)
+    ) {
       return { reviewStatus: "changes_requested", reviewedHeadSha: exactReview.commitId };
     }
     return { reviewStatus: "approved", reviewedHeadSha: exactReview.commitId };

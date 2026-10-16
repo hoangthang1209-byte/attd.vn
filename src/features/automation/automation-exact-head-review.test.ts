@@ -67,6 +67,22 @@ describe("automation-exact-head-review", () => {
     assert.equal(countReviewRequestMarkersForHead(pullNumber, headSha, comments), 2);
   });
 
+  it("exact-head COMMENTED review with P1 does not approve (dashboard matches merge gate)", () => {
+    const headSha = "sha-blocked";
+    const blockedBody = `<!-- CURSOR_AUTOMATION_ID: test -->
+## Independent ATTD PR Review
+
+#### P1 — High
+
+**1. Blocking finding**`;
+
+    const gate = resolveExactHeadReviewGate({
+      headSha,
+      reviews: [{ commitId: headSha, body: blockedBody, state: "COMMENTED" }],
+    });
+    assert.equal(gate.reviewStatus, "changes_requested");
+  });
+
   it("5. current-head review arrives → exact-head gate approves and is not stale", () => {
     const headSha = "sha-current";
     const reviews = [

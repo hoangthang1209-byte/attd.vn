@@ -38,6 +38,7 @@ import type {
   PullRequestVerificationCiStatus,
   PullRequestVerificationReviewStatus,
 } from "@/features/automation/automation-task.types";
+import { resolveExactHeadReviewGate } from "@/features/automation/automation-exact-head-review";
 
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
@@ -838,45 +839,19 @@ function mapPullReviewState(
   reviewStatus: PullRequestVerificationReviewStatus;
   reviewedHeadSha: string | null;
 } {
-  const snapshots = reviews.map((review) => ({
-    commitId: review.commit_id?.trim() || null,
-    body: review.body ?? "",
-    state: review.state,
-  }));
+  const gate = resolveExactHeadReviewGate({
+    headSha,
+    reviews: reviews.map((review) => ({
+      commitId: review.commit_id?.trim() || null,
+      body: review.body ?? "",
+      state: review.state,
+    })),
+  });
 
-  // Lazy import avoided — inline exact-head gate to keep loader dependency-free at module init.
-  const exactReview = snapshots.find(
-    (review) =>
-      review.commitId === headSha &&
-      review.body.includes("CURSOR_AUTOMATION_ID:") &&
-      review.body.includes("Independent ATTD PR Review"),
-  );
-
-  if (exactReview) {
-    return {
-      reviewStatus:
-        exactReview.state === "CHANGES_REQUESTED" ? "changes_requested" : "approved",
-      reviewedHeadSha: exactReview.commitId,
-    };
-  }
-
-  const hasStaleIndependentReview = snapshots.some(
-    (review) =>
-      review.commitId &&
-      review.commitId !== headSha &&
-      review.body.includes("CURSOR_AUTOMATION_ID:") &&
-      review.body.includes("Independent ATTD PR Review"),
-  );
-
-  if (hasStaleIndependentReview) {
-    return { reviewStatus: "stale", reviewedHeadSha: null };
-  }
-
-  if (reviews.length > 0) {
-    return { reviewStatus: "pending", reviewedHeadSha: null };
-  }
-
-  return { reviewStatus: "unknown", reviewedHeadSha: null };
+  return {
+    reviewStatus: gate.reviewStatus,
+    reviewedHeadSha: gate.reviewedHeadSha,
+  };
 }
 
 export async function fetchPullRequestVerificationSafe(

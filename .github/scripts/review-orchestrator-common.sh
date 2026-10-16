@@ -10,8 +10,8 @@ readonly REVIEW_ORCHESTRATOR_MARKER_PREFIX="REVIEW_ORCHESTRATOR_IDEMPOTENCY:"
 readonly REVIEW_ORCHESTRATOR_REQUESTED_PREFIX="REVIEW_ORCHESTRATOR_REQUESTED:"
 readonly REVIEW_ORCHESTRATOR_STALLED_PREFIX="REVIEW_ORCHESTRATOR_STALLED:"
 readonly REQUEST_INDEPENDENT_REVIEW_TOKEN="REQUEST_INDEPENDENT_REVIEW"
-readonly REVIEW_WATCHDOG_TIMEOUT_MINUTES="${REVIEW_WATCHDOG_TIMEOUT_MINUTES:-25}"
-readonly REVIEW_WATCHDOG_RETRY_COOLDOWN_MINUTES="${REVIEW_WATCHDOG_RETRY_COOLDOWN_MINUTES:-25}"
+REVIEW_WATCHDOG_TIMEOUT_MINUTES="${REVIEW_WATCHDOG_TIMEOUT_MINUTES:-25}"
+REVIEW_WATCHDOG_RETRY_COOLDOWN_MINUTES="${REVIEW_WATCHDOG_RETRY_COOLDOWN_MINUTES:-25}"
 
 review_orchestrator_idempotency_marker() {
   local kind="$1"
@@ -111,11 +111,19 @@ latest_marker_comment_created_epoch() {
     ' 2>/dev/null
 }
 
+review_orchestrator_now_epoch() {
+  if [ -n "${REVIEW_ORCHESTRATOR_NOW_EPOCH:-}" ]; then
+    printf '%s' "$REVIEW_ORCHESTRATOR_NOW_EPOCH"
+    return 0
+  fi
+  date -u +%s
+}
+
 minutes_since_iso_timestamp() {
   local iso="$1"
   local now_epoch then_epoch
   [ -z "$iso" ] && return 1
-  now_epoch="$(date -u +%s)"
+  now_epoch="$(review_orchestrator_now_epoch)"
   then_epoch="$(date -u -d "$iso" +%s 2>/dev/null || return 1)"
   printf '%s' "$(( (now_epoch - then_epoch) / 60 ))"
 }
