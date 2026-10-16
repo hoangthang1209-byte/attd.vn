@@ -25,6 +25,10 @@ export type ClassifierInput = {
   industryTerms?: string[];
   libraryCode?: string | null;
   roleCode?: string | null;
+  /** Folder upload path segments — low-weight hints only. */
+  pathHints?: string[];
+  width?: number | null;
+  height?: number | null;
 };
 
 export type MetadataProviderInput = ClassifierInput & {
@@ -33,6 +37,7 @@ export type MetadataProviderInput = ClassifierInput & {
   orientation?: string | null;
   dominantColor?: string | null;
   mimeType?: string | null;
+  pathHints?: string[];
 };
 
 export interface MediaClassifier {

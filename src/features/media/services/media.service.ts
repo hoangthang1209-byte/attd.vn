@@ -31,6 +31,7 @@ import {
 } from "@/lib/productionFileValidation";
 import { deleteR2Object } from "@/features/storage/r2/r2-production-file.service";
 import { MEDIA_LIBRARY_PAGE_SIZE } from "@/components/admin/media/media-library-api";
+import { normalizeIngestRelativePath } from "@/features/media/media-ingest-hints";
 import {
   deriveMediaOrientation,
   emptyToNull,
@@ -501,6 +502,7 @@ export type UploadMediaInput = {
   audienceTerms?: string[];
   useCaseTerms?: string[];
   contentSuitabilities?: MediaContentSuitability[];
+  ingestRelativePath?: string | null;
 };
 
 export type UploadMediaResult = {
@@ -585,6 +587,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     audienceTerms,
     useCaseTerms,
     contentSuitabilities,
+    ingestRelativePath,
   } = input;
 
   assertNotR2SourceFile(file.name, file.type, file.size);
@@ -603,7 +606,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
   const mimeType = validation.mimeType;
   const warning =
     file.size > LARGE_IMAGE_WARNING_SIZE
-      ? `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB), nên tối ưu trước khi upload để website tải nhanh hơn.`
+      ? `Ảnh lớn (${(file.size / 1024).toFixed(0)}KB) — bản gốc được giữ; trang public dùng bản tối ưu khi hiển thị.`
       : undefined;
 
   const mediaFolder = STORAGE_FOLDER_TO_MEDIA[folder];
@@ -694,6 +697,11 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
     ? await resolveVocabularyTerms("USE_CASE", useCaseTerms)
     : [];
   const resolvedSuitabilities = normalizeContentSuitabilities(contentSuitabilities);
+  const normalizedRelativePath = normalizeIngestRelativePath(ingestRelativePath);
+  const ingestMetadata =
+    normalizedRelativePath != null
+      ? ({ ingest: { relativePath: normalizedRelativePath } } as Prisma.InputJsonValue)
+      : undefined;
 
   const storage = requireCloudinaryStorageAdapter();
   const result = await storage.upload(folder, file.name, buffer, mimeType);
@@ -742,6 +750,7 @@ export async function uploadMediaAsset(input: UploadMediaInput): Promise<UploadM
           audienceTerms: resolvedAudiences,
           useCaseTerms: resolvedUseCases,
           contentSuitabilities: resolvedSuitabilities,
+          ...(ingestMetadata ? { metadata: ingestMetadata } : {}),
           ...(validatedCollectionIds.length
             ? {
                 collections: {

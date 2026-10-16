@@ -53,6 +53,12 @@ describe("getPublicMediaUrl", () => {
     );
   });
 
+  it("applies web delivery transforms when requested", () => {
+    const raw = "https://res.cloudinary.com/demo/image/upload/v1/attd/products/a.jpg";
+    const delivered = getPublicMediaUrl(raw, { webDelivery: true });
+    assert.match(delivered ?? "", /w_1600,c_limit,q_auto:good,f_auto/);
+  });
+
   it("prefers MediaAsset.url over thumbnail", () => {
     assert.equal(
       getPublicMediaUrl({

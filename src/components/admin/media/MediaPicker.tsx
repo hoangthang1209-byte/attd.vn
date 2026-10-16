@@ -16,11 +16,15 @@ import {
 import { CardGridLoading, ButtonLoading } from "@/components/ui/loading/ContextLoading";
 import { useAdminToast } from "@/hooks/useAdminToast";
 import { ALLOWED_IMAGE_EXTENSIONS, inferImageMimeType } from "@/lib/imageValidation";
-import type { StorageFolderKey } from "@/lib/storage/types";
+import {
+  LARGE_IMAGE_WARNING_SIZE,
+  MAX_IMAGE_SIZE,
+  type StorageFolderKey,
+} from "@/lib/storage/types";
 import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
-const WARN_FILE_SIZE = 500 * 1024;
+const MAX_FILE_SIZE = MAX_IMAGE_SIZE;
+const WARN_FILE_SIZE = LARGE_IMAGE_WARNING_SIZE;
 const isDev = process.env.NODE_ENV === "development";
 
 type RawMediaItem = Record<string, unknown>;
@@ -465,12 +469,12 @@ export default function MediaPicker(props: Props) {
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setUploadWarning("Dung lượng tối đa 2MB/ảnh.");
+      setUploadWarning(`Dung lượng tối đa ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB/ảnh.`);
       return;
     }
     setUploadWarning(
       file.size > WARN_FILE_SIZE
-        ? "Ảnh lớn hơn 500KB. Khuyến nghị 200–300KB."
+        ? "Ảnh lớn — bản gốc được giữ; website dùng bản tối ưu khi hiển thị."
         : null
     );
 

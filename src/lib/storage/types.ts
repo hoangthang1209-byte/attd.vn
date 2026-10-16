@@ -59,5 +59,6 @@ export {
   validateImageUpload,
 } from "@/lib/imageValidation";
 
-export const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB per sprint 24.9.3
-export const LARGE_IMAGE_WARNING_SIZE = 500 * 1024; // 500KB — show warning
+/** Ingest cap for Media Library bulk/folder upload (original retained in storage). */
+export const MAX_IMAGE_SIZE = 25 * 1024 * 1024;
+export const LARGE_IMAGE_WARNING_SIZE = 500 * 1024; // 500KB — web delivery optimized at render

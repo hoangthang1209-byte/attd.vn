@@ -4,6 +4,10 @@
  * Never invents matches. Never mutates storage.
  */
 
+import {
+  getCardDeliveryMediaUrl,
+  getWebDeliveryMediaUrl,
+} from "@/features/media/cloudinary-delivery-url";
 import { getPublicMediaUrl } from "@/features/media/get-public-media-url";
 
 export type ResolvableMediaAsset = {
@@ -23,6 +27,8 @@ export type ResolveMediaInput = {
   legacyUrl?: string | null;
   /** Prefer thumbnail when resolving card-sized images */
   preferThumbnail?: boolean;
+  /** Public storefront: serve optimized Cloudinary delivery, not oversized originals. */
+  webDelivery?: boolean;
 };
 
 export type ResolvedMedia = {
@@ -58,7 +64,13 @@ export function resolveMedia(
       const candidate = input.preferThumbnail
         ? asset.thumbnailUrl || asset.url
         : asset.url || asset.thumbnailUrl;
-      const src = getPublicMediaUrl(candidate ?? null);
+      let src = getPublicMediaUrl(candidate ?? null);
+      if (src && input.webDelivery) {
+        src =
+          (input.preferThumbnail
+            ? getCardDeliveryMediaUrl(src)
+            : getWebDeliveryMediaUrl(src)) ?? src;
+      }
       if (src) {
         return {
           src,
@@ -71,7 +83,12 @@ export function resolveMedia(
     }
   }
 
-  const legacy = getPublicMediaUrl(input.legacyUrl ?? null);
+  let legacy = getPublicMediaUrl(input.legacyUrl ?? null);
+  if (legacy && input.webDelivery) {
+    legacy =
+      (input.preferThumbnail ? getCardDeliveryMediaUrl(legacy) : getWebDeliveryMediaUrl(legacy)) ??
+      legacy;
+  }
   if (legacy) {
     return {
       src: legacy,
@@ -147,11 +164,13 @@ export function resolveEntityMediaSrc(input: {
   mediaAssetId?: string | null;
   imageUrl?: string | null;
   preferThumbnail?: boolean;
+  webDelivery?: boolean;
 }): string | null {
   return resolveMedia({
     mediaAsset: input.mediaAsset,
     mediaAssetId: input.mediaAssetId,
     legacyUrl: input.imageUrl,
     preferThumbnail: input.preferThumbnail,
+    webDelivery: input.webDelivery ?? true,
   }).src;
 }

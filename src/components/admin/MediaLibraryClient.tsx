@@ -22,6 +22,8 @@ import {
   ALLOWED_IMAGE_EXTENSIONS,
   inferImageMimeType,
 } from "@/lib/imageValidation";
+import { MAX_IMAGE_SIZE, LARGE_IMAGE_WARNING_SIZE } from "@/lib/storage/types";
+import { mediaAdvancedToolsEnabled } from "@/features/media/media-staff-ux";
 import { MEDIA_TO_STORAGE_FOLDER } from "@/lib/storage/types";
 import { resolveLegacyFolderFromLibraryCode } from "@/features/media/media-classification";
 import { CardGridLoading, InlineLoading } from "@/components/ui/loading/ContextLoading";
@@ -39,8 +41,8 @@ import {
   type MediaIntelligenceQuickPreset,
 } from "@/features/media/media-intelligence-filters";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
-const WARN_FILE_SIZE = 500 * 1024;
+const MAX_FILE_SIZE = MAX_IMAGE_SIZE;
+const WARN_FILE_SIZE = LARGE_IMAGE_WARNING_SIZE;
 const MAX_BATCH = 50;
 const BULK_MAX = 100;
 
@@ -460,7 +462,9 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     useState<Record<SemanticTermField, string>>(emptySemanticSearchState);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const folderFileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+  const showAdvancedTools = mediaAdvancedToolsEnabled(searchParams);
 
   const loadTaxonomy = useCallback(async () => {
     try {
@@ -645,12 +649,15 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
     const mimeType = inferImageMimeType(file.name, file.type);
     if (!mimeType) return { ok: false, error: "Định dạng không hỗ trợ. Chỉ hỗ trợ JPG, PNG, WebP." };
     if (file.size > MAX_FILE_SIZE) {
-      return { ok: false, error: `Dung lượng tối đa 2MB/ảnh (${(file.size / 1024 / 1024).toFixed(1)}MB).` };
+      return {
+        ok: false,
+        error: `Dung lượng tối đa ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB/ảnh (${(file.size / 1024 / 1024).toFixed(1)}MB).`,
+      };
     }
     if (file.size > WARN_FILE_SIZE) {
       return {
         ok: true,
-        warning: `Ảnh này lớn hơn 500KB (${(file.size / 1024).toFixed(0)}KB). Khuyến nghị 200–300KB để website tải nhanh.`,
+        warning: `Ảnh lớn (${(file.size / 1024).toFixed(0)}KB) — bản gốc được giữ; website dùng bản tối ưu khi hiển thị.`,
       };
     }
     return { ok: true };
@@ -678,6 +685,8 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   ): FormData {
     const fd = new FormData();
     fd.append("file", item.file);
+    const relativePath = item.file.webkitRelativePath?.trim();
+    if (relativePath) fd.append("ingestRelativePath", relativePath);
     const uploadLibrary = libraries.find((l) => l.id === uploadLibraryId);
     const storageFolder = uploadLibrary
       ? MEDIA_TO_STORAGE_FOLDER[resolveLegacyFolderFromLibraryCode(uploadLibrary.code)]
@@ -1550,15 +1559,19 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
   return (
     <div className="admin-media-page">
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <Link href="/admin/media/dashboard" className="admin-btn admin-btn--secondary admin-btn--xs">
-          Media Dashboard
-        </Link>
         <Link href="/admin/media/inbox" className="admin-btn admin-btn--secondary admin-btn--xs">
-          Incoming / Review
+          Media Inbox
         </Link>
-        <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary admin-btn--xs">
-          Lifecycle
-        </Link>
+        {showAdvancedTools ? (
+          <>
+            <Link href="/admin/media/dashboard" className="admin-btn admin-btn--secondary admin-btn--xs">
+              Media Dashboard
+            </Link>
+            <Link href="/admin/media/lifecycle" className="admin-btn admin-btn--secondary admin-btn--xs">
+              Lifecycle
+            </Link>
+          </>
+        ) : null}
         {(workflowLane || unusedOnly || recentlyUploadedDays !== "" || maximumSeoScore !== "" || duplicateStatusFilter) && (
           <button
             type="button"
@@ -1589,13 +1602,39 @@ export default function MediaLibraryClient({ cmsReady = true }: { cmsReady?: boo
             <span className="admin-media-dropzone-icon">🖼</span>
             <strong>Kéo thả ảnh vào đây</strong>
             <span className="admin-field-hint">
-              hoặc click để chọn ảnh (JPG, PNG, WebP · max 2MB · tối đa 50 ảnh)
+              hoặc click để chọn ảnh (JPG, PNG, WebP · tối đa {(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)}MB/ảnh ·
+              50 ảnh/lần)
             </span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 8 }}>
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-btn--xs"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  folderFileRef.current?.click();
+                }}
+              >
+                Chọn thư mục
+              </button>
+            </div>
           </div>
           <input
             ref={fileRef}
             type="file"
             accept={ALLOWED_IMAGE_EXTENSIONS.join(",")}
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) addFilesToQueue(Array.from(e.target.files));
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={(element) => {
+              folderFileRef.current = element;
+              if (element) element.setAttribute("webkitdirectory", "");
+            }}
+            type="file"
             multiple
             hidden
             onChange={(e) => {

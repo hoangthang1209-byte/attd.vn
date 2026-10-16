@@ -31,8 +31,8 @@ export default function ProductMediaFrame({
   className = "",
   placeholderCompact = false,
 }: ProductMediaFrameProps) {
-  const resolvedPrimary = getPublicMediaUrl(imageUrl);
-  const resolvedHover = getPublicMediaUrl(hoverImageUrl);
+  const resolvedPrimary = getPublicMediaUrl(imageUrl, { webDelivery: true });
+  const resolvedHover = getPublicMediaUrl(hoverImageUrl, { webDelivery: true });
   const [primaryFailed, setPrimaryFailed] = useState(false);
   const [hoverFailed, setHoverFailed] = useState(false);
 
