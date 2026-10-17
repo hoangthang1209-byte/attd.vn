@@ -13,6 +13,7 @@ MOCK_PR_COMMENT_COUNT=0
 MOCK_BUILD_APPROVED_POSTS=0
 MOCK_ISSUE_HAS_BUILD_APPROVED=0
 MOCK_LAST_PR_COMMENT_BODY=""
+MOCK_PR_HEAD_SHA="handler-review-sha"
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1"; failures=$((failures + 1)); }
@@ -58,6 +59,10 @@ find_open_repair_issue_for_pr() {
 }
 
 gh() {
+  if [ "$1" = "pr" ] && [ "$2" = "view" ] && [ "$4" = "--json" ] && [ "${5:-}" = "headRefOid" ]; then
+    printf '%s' "$MOCK_PR_HEAD_SHA"
+    return 0
+  fi
   if [ "$1" = "pr" ] && [ "$2" = "comment" ]; then
     shift 2
     while [ $# -gt 0 ]; do
@@ -106,6 +111,7 @@ reset_mocks() {
   MOCK_BUILD_APPROVED_POSTS=0
   MOCK_ISSUE_HAS_BUILD_APPROVED=0
   MOCK_LAST_PR_COMMENT_BODY=""
+  MOCK_PR_HEAD_SHA="handler-review-sha"
 }
 
 # Issue #50 P2.1: claim-only PR marker + open repair issue + resume => one terminal marker.
@@ -146,8 +152,19 @@ else
   fail "duplicate resume after terminal marker is a no-op (got ${MOCK_PR_COMMENT_COUNT})"
 fi
 
+# Stale independent review must not advance merge gate.
+reset_mocks
+MOCK_PR_HEAD_SHA="current-head-sha"
+handle_reviewer_outcome "50" "stale-head-sha" "$(sample_review_p2)" "run-stale"
+if [ "$MOCK_PR_COMMENT_COUNT" -eq 0 ] && [ "$MOCK_BUILD_APPROVED_POSTS" -eq 0 ]; then
+  pass "stale independent review is ignored for merge gate"
+else
+  fail "stale independent review is ignored for merge gate"
+fi
+
 # Handler: reviewer outcome resumes existing open repair issue.
 reset_mocks
+MOCK_PR_HEAD_SHA="handler-review-sha"
 review_marker="$(orchestrator_idempotency_marker "review" "50" "handler-review-sha")"
 MOCK_REPAIR_ISSUES="|${review_marker}|"
 handle_reviewer_outcome "50" "handler-review-sha" "$(sample_review_p2)" "run-1"

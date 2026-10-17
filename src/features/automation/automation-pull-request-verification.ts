@@ -27,6 +27,8 @@ function formatReviewStatusLabel(status: PullRequestVerificationReviewStatus): s
       return "Review ❌";
     case "pending":
       return "Review ⏳";
+    case "stale":
+      return "Review ⏳ (stale)";
     default:
       return "Review ?";
   }
@@ -36,6 +38,9 @@ export function formatPullRequestVerificationDisplay(
   verification: PullRequestVerification | null | undefined,
 ): string | null {
   if (!verification) return null;
+  if (verification.reviewStalled || verification.waitHuman) {
+    return `${formatCiStatusLabel(verification.ciStatus)} · Review ⏸ · WAIT_HUMAN`;
+  }
   return `${formatCiStatusLabel(verification.ciStatus)} · ${formatReviewStatusLabel(verification.reviewStatus)}`;
 }
 

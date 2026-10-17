@@ -47,11 +47,17 @@ export type PullRequestVerificationReviewStatus =
   | "approved"
   | "changes_requested"
   | "pending"
+  | "stale"
   | "unknown";
 
 export type PullRequestVerification = {
   ciStatus: PullRequestVerificationCiStatus;
   reviewStatus: PullRequestVerificationReviewStatus;
+  headSha?: string;
+  reviewedHeadSha?: string | null;
+  reviewStalled?: boolean;
+  waitHuman?: boolean;
+  reviewStalledReason?: string | null;
 };
 
 export type AutomationLinkedPullRequest = {

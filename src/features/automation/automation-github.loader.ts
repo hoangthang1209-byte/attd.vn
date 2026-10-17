@@ -38,6 +38,10 @@ import type {
   PullRequestVerificationCiStatus,
   PullRequestVerificationReviewStatus,
 } from "@/features/automation/automation-task.types";
+import {
+  detectReviewOrchestratorStalled,
+  resolveExactHeadReviewGate,
+} from "@/features/automation/automation-exact-head-review";
 
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
@@ -186,6 +190,12 @@ type GitHubCommitStatusResponse = {
 type GitHubPullReviewResponse = {
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
   submitted_at: string;
+  commit_id?: string | null;
+  body?: string | null;
+};
+
+type GitHubPullCommentResponse = {
+  body: string;
 };
 
 export type SearchIssuesPaginatedResult = {
@@ -825,16 +835,57 @@ function mapCombinedStatusState(state: GitHubCommitStatusResponse["state"]): Pul
   }
 }
 
-function mapPullReviewState(reviews: GitHubPullReviewResponse[]): PullRequestVerificationReviewStatus {
-  const meaningfulReviews = reviews
-    .filter((review) => review.state === "APPROVED" || review.state === "CHANGES_REQUESTED")
-    .sort((left, right) => Date.parse(right.submitted_at) - Date.parse(left.submitted_at));
+function mapPullReviewState(
+  headSha: string,
+  reviews: GitHubPullReviewResponse[],
+): {
+  reviewStatus: PullRequestVerificationReviewStatus;
+  reviewedHeadSha: string | null;
+} {
+  const gate = resolveExactHeadReviewGate({
+    headSha,
+    reviews: reviews.map((review) => ({
+      commitId: review.commit_id?.trim() || null,
+      body: review.body ?? "",
+      state: review.state,
+    })),
+  });
 
-  if (meaningfulReviews.length === 0) {
-    return reviews.length > 0 ? "pending" : "unknown";
+  return {
+    reviewStatus: gate.reviewStatus,
+    reviewedHeadSha: gate.reviewedHeadSha,
+  };
+}
+
+async function fetchPullRequestCommentBodies(
+  pullNumber: number,
+  headSha: string,
+): Promise<string[]> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    return [];
   }
 
-  return meaningfulReviews[0]?.state === "CHANGES_REQUESTED" ? "changes_requested" : "approved";
+  const bodies: string[] = [];
+  for (let page = 1; page <= ISSUE_COMMENTS_MAX_PAGES; page += 1) {
+    const pageComments = await githubRequest<GitHubPullCommentResponse[]>(
+      `/repos/${config.owner}/${config.repo}/issues/${pullNumber}/comments?per_page=${ISSUE_COMMENTS_PAGE_SIZE}&page=${page}`,
+    );
+    for (const comment of pageComments) {
+      bodies.push(comment.body);
+    }
+
+    const stalled = detectReviewOrchestratorStalled(headSha, bodies);
+    if (stalled.reviewStalled) {
+      return bodies;
+    }
+
+    if (pageComments.length < ISSUE_COMMENTS_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return bodies;
 }
 
 export async function fetchPullRequestVerificationSafe(
@@ -851,18 +902,27 @@ export async function fetchPullRequestVerificationSafe(
     );
 
     const headSha = pull.head.sha;
-    const [combinedStatus, reviews] = await Promise.all([
+    const [combinedStatus, reviews, commentBodies] = await Promise.all([
       githubRequest<GitHubCommitStatusResponse>(
         `/repos/${config.owner}/${config.repo}/commits/${headSha}/status`,
       ),
       githubRequest<GitHubPullReviewResponse[]>(
         `/repos/${config.owner}/${config.repo}/pulls/${pullNumber}/reviews`,
       ),
+      fetchPullRequestCommentBodies(pullNumber, headSha),
     ]);
+
+    const reviewGate = mapPullReviewState(headSha, reviews);
+    const stalled = detectReviewOrchestratorStalled(headSha, commentBodies);
 
     return {
       ciStatus: mapCombinedStatusState(combinedStatus.state),
-      reviewStatus: mapPullReviewState(reviews),
+      reviewStatus: reviewGate.reviewStatus,
+      headSha,
+      reviewedHeadSha: reviewGate.reviewedHeadSha,
+      reviewStalled: stalled.reviewStalled,
+      waitHuman: stalled.waitHuman,
+      reviewStalledReason: stalled.reason,
     };
   } catch (error) {
     if (isRecoverableGitHubLookupError(error)) {
