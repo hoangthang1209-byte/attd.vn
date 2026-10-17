@@ -1,4 +1,4 @@
-import { isAttdReviewBlockedByP0P1 } from "@/features/automation/automation-pr-review-severity";
+import { isAttdReviewBlockedForDashboard } from "@/features/automation/automation-pr-review-severity";
 
 export const REQUEST_INDEPENDENT_REVIEW_TOKEN = "REQUEST_INDEPENDENT_REVIEW";
 export const REVIEW_ORCHESTRATOR_MARKER_PREFIX = "REVIEW_ORCHESTRATOR_IDEMPOTENCY:";
@@ -45,7 +45,7 @@ export function resolveExactHeadReviewGate(input: {
   if (exactReview) {
     if (
       exactReview.state === "CHANGES_REQUESTED" ||
-      isAttdReviewBlockedByP0P1(exactReview.body)
+      isAttdReviewBlockedForDashboard(exactReview.body)
     ) {
       return { reviewStatus: "changes_requested", reviewedHeadSha: exactReview.commitId };
     }

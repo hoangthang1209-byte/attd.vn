@@ -67,6 +67,24 @@ describe("automation-exact-head-review", () => {
     assert.equal(countReviewRequestMarkersForHead(pullNumber, headSha, comments), 2);
   });
 
+  it("exact-head COMMENTED review with P2 does not approve (dashboard matches repair gate)", () => {
+    const headSha = "sha-p2";
+    const p2Body = `<!-- CURSOR_AUTOMATION_ID: test -->
+## Independent ATTD PR Review
+
+No P0/P1 findings.
+
+#### P2 — Medium
+
+**1. Non-blocking but requires repair**`;
+
+    const gate = resolveExactHeadReviewGate({
+      headSha,
+      reviews: [{ commitId: headSha, body: p2Body, state: "COMMENTED" }],
+    });
+    assert.equal(gate.reviewStatus, "changes_requested");
+  });
+
   it("exact-head COMMENTED review with P1 does not approve (dashboard matches merge gate)", () => {
     const headSha = "sha-blocked";
     const blockedBody = `<!-- CURSOR_AUTOMATION_ID: test -->

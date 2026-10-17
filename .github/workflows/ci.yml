@@ -95,6 +95,7 @@ jobs:
             bash "$test_script"
           done
           bash .github/scripts/review-orchestrator-common.test.sh
+          bash .github/scripts/gh-cli-jq-syntax.test.sh
 
       - name: Tests
         run: npm test --if-present

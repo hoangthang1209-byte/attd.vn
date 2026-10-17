@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   isAttdReviewBlockedByP0P1,
+  isAttdReviewBlockedForDashboard,
   parseAttdPrReviewSeverityCounts,
 } from "@/features/automation/automation-pr-review-severity";
 
@@ -30,6 +31,7 @@ describe("automation-pr-review-severity", () => {
     assert.equal(counts.p1, 0);
     assert.equal(counts.p2, 1);
     assert.equal(isAttdReviewBlockedByP0P1(cleanReview), false);
+    assert.equal(isAttdReviewBlockedForDashboard(cleanReview), true);
   });
 
   it("matches shell parser for P1-blocked review", () => {

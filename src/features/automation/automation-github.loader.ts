@@ -38,7 +38,10 @@ import type {
   PullRequestVerificationCiStatus,
   PullRequestVerificationReviewStatus,
 } from "@/features/automation/automation-task.types";
-import { resolveExactHeadReviewGate } from "@/features/automation/automation-exact-head-review";
+import {
+  detectReviewOrchestratorStalled,
+  resolveExactHeadReviewGate,
+} from "@/features/automation/automation-exact-head-review";
 
 const DEFAULT_REPO = "hoangthang1209-byte/attd.vn";
 const SEARCH_PAGE_SIZE = 100;
@@ -854,6 +857,37 @@ function mapPullReviewState(
   };
 }
 
+async function fetchPullRequestCommentBodies(
+  pullNumber: number,
+  headSha: string,
+): Promise<string[]> {
+  const config = getAutomationGitHubConfig();
+  if (!config.configured || !config.owner || !config.repo) {
+    return [];
+  }
+
+  const bodies: string[] = [];
+  for (let page = 1; page <= ISSUE_COMMENTS_MAX_PAGES; page += 1) {
+    const pageComments = await githubRequest<GitHubPullCommentResponse[]>(
+      `/repos/${config.owner}/${config.repo}/issues/${pullNumber}/comments?per_page=${ISSUE_COMMENTS_PAGE_SIZE}&page=${page}`,
+    );
+    for (const comment of pageComments) {
+      bodies.push(comment.body);
+    }
+
+    const stalled = detectReviewOrchestratorStalled(headSha, bodies);
+    if (stalled.reviewStalled) {
+      return bodies;
+    }
+
+    if (pageComments.length < ISSUE_COMMENTS_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return bodies;
+}
+
 export async function fetchPullRequestVerificationSafe(
   pullNumber: number,
 ): Promise<PullRequestVerification | null> {
@@ -868,39 +902,27 @@ export async function fetchPullRequestVerificationSafe(
     );
 
     const headSha = pull.head.sha;
-    const [combinedStatus, reviews, comments] = await Promise.all([
+    const [combinedStatus, reviews, commentBodies] = await Promise.all([
       githubRequest<GitHubCommitStatusResponse>(
         `/repos/${config.owner}/${config.repo}/commits/${headSha}/status`,
       ),
       githubRequest<GitHubPullReviewResponse[]>(
         `/repos/${config.owner}/${config.repo}/pulls/${pullNumber}/reviews`,
       ),
-      githubRequest<GitHubPullCommentResponse[]>(
-        `/repos/${config.owner}/${config.repo}/issues/${pullNumber}/comments?per_page=100`,
-      ),
+      fetchPullRequestCommentBodies(pullNumber, headSha),
     ]);
 
     const reviewGate = mapPullReviewState(headSha, reviews);
-    const commentBodies = comments.map((comment) => comment.body);
-    const stalledMarker = `REVIEW_ORCHESTRATOR_IDEMPOTENCY: stalled-pr-${pullNumber}-sha-${headSha}`;
-    const stalledComment = commentBodies.find(
-      (body) =>
-        body.includes("REVIEW_ORCHESTRATOR_STALLED:") && body.includes(stalledMarker),
-    );
-    const stalledReason =
-      stalledComment
-        ?.split("\n")
-        .find((line) => line.startsWith("REVIEW_ORCHESTRATOR_STALLED:"))
-        ?.trim() ?? null;
+    const stalled = detectReviewOrchestratorStalled(headSha, commentBodies);
 
     return {
       ciStatus: mapCombinedStatusState(combinedStatus.state),
       reviewStatus: reviewGate.reviewStatus,
       headSha,
       reviewedHeadSha: reviewGate.reviewedHeadSha,
-      reviewStalled: Boolean(stalledComment),
-      waitHuman: Boolean(stalledComment),
-      reviewStalledReason: stalledReason,
+      reviewStalled: stalled.reviewStalled,
+      waitHuman: stalled.waitHuman,
+      reviewStalledReason: stalled.reason,
     };
   } catch (error) {
     if (isRecoverableGitHubLookupError(error)) {

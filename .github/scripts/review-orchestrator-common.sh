@@ -22,17 +22,17 @@ review_orchestrator_idempotency_marker() {
 
 pull_request_head_sha() {
   local pull_number="$1"
-  gh pr view "$pull_number" --json headRefOid --jq -r '.headRefOid'
+  gh pr view "$pull_number" --json headRefOid --jq '.headRefOid'
 }
 
 pull_request_is_draft() {
   local pull_number="$1"
-  gh pr view "$pull_number" --json isDraft --jq -r '.isDraft' | grep -qx 'true'
+  gh pr view "$pull_number" --json isDraft --jq '.isDraft' | grep -qx 'true'
 }
 
 commit_ci_state_for_sha() {
   local head_sha="$1"
-  gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/status" --jq -r '.state' 2>/dev/null || printf 'unknown'
+  gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/status" --jq '.state' 2>/dev/null || printf 'unknown'
 }
 
 commit_ci_is_green() {

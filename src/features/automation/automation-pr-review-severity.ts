@@ -67,3 +67,9 @@ export function isAttdReviewBlockedByP0P1(body: string): boolean {
   const { p0, p1 } = parseAttdPrReviewSeverityCounts(body);
   return p0 > 0 || p1 > 0;
 }
+
+/** Dashboard must not show Review ✅ when merge/repair gate would not advance. */
+export function isAttdReviewBlockedForDashboard(body: string): boolean {
+  const { p0, p1, p2 } = parseAttdPrReviewSeverityCounts(body);
+  return p0 > 0 || p1 > 0 || p2 > 0;
+}
