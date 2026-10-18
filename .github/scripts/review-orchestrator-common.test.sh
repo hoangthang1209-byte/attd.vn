@@ -47,6 +47,32 @@ mock_record_marker_from_body() {
   done <<< "$body"
 }
 
+mock_comments_json_from_bodies() {
+  local store="$1"
+  local comments_json='[]'
+  local body marker iso
+
+  if [ -z "$store" ]; then
+    printf '{"comments":[]}'
+    return 0
+  fi
+
+  while IFS= read -r -d $'\x1e' body || [ -n "$body" ]; do
+    [ -z "$body" ] && continue
+    iso="1970-01-01T00:00:00Z"
+    for marker in "${!MOCK_MARKER_CREATED_EPOCH[@]}"; do
+      if [[ "$body" == *"$marker"* ]]; then
+        iso="$(mock_epoch_to_iso "${MOCK_MARKER_CREATED_EPOCH[$marker]}")"
+        break
+      fi
+    done
+    comments_json="$(jq -n --argjson arr "$comments_json" --arg body "$body" --arg createdAt "$iso" \
+      '$arr + [{body: $body, createdAt: $createdAt}]')"
+  done <<< "${store}"$'\x1e'
+
+  jq -n --argjson comments "$comments_json" '{comments: $comments}'
+}
+
 gh() {
   case "$1" in
     pr)
@@ -61,25 +87,7 @@ gh() {
           return 0
         fi
         if [ "$4" = "--json" ] && [ "$json_field" = "comments" ]; then
-          if [ "${6:-}" = "--jq" ]; then
-            local jq_expr="${10:-}"
-            local marker="${9:-}"
-            if [[ "$jq_expr" == *"createdAt"* ]]; then
-              if [ -n "$marker" ] && [ -n "${MOCK_MARKER_CREATED_EPOCH[$marker]:-}" ]; then
-                mock_epoch_to_iso "${MOCK_MARKER_CREATED_EPOCH[$marker]}"
-              else
-                printf ''
-              fi
-              return 0
-            fi
-            if [ -n "$marker" ] && [[ "$MOCK_PR_COMMENTS" == *"$marker"* ]]; then
-              printf '1'
-            else
-              printf '0'
-            fi
-            return 0
-          fi
-          printf '{"comments":[]}'
+          mock_comments_json_from_bodies "$MOCK_PR_COMMENTS"
           return 0
         fi
       fi
@@ -88,7 +96,7 @@ gh() {
         while [ $# -gt 0 ]; do
           if [ "$1" = "--body" ]; then
             mock_record_marker_from_body "$2"
-            MOCK_PR_COMMENTS="${MOCK_PR_COMMENTS}"$'\n'"$2"
+            MOCK_PR_COMMENTS="${MOCK_PR_COMMENTS}"$'\x1e'"$2"
             shift 2
             continue
           fi
@@ -112,17 +120,8 @@ gh() {
         printf '[]'
         return 0
       fi
-      if [ "$2" = "view" ] && [ "$4" = "comments" ]; then
-        if [[ "${6:-}" == *"contains(\$marker)"* ]]; then
-          local marker="${9:-}"
-          if [ -n "$marker" ] && [[ "$MOCK_ISSUE_COMMENTS" == *"$marker"* ]]; then
-            printf '1'
-          else
-            printf '0'
-          fi
-          return 0
-        fi
-        printf '{"comments":[]}'
+      if [ "$2" = "view" ] && [ "$4" = "--json" ] && [ "${5:-}" = "comments" ]; then
+        mock_comments_json_from_bodies "$MOCK_ISSUE_COMMENTS"
         return 0
       fi
       if [ "$2" = "comment" ]; then
@@ -130,7 +129,7 @@ gh() {
         while [ $# -gt 0 ]; do
           if [ "$1" = "--body" ]; then
             mock_record_marker_from_body "$2"
-            MOCK_ISSUE_COMMENTS="${MOCK_ISSUE_COMMENTS}"$'\n'"$2"
+            MOCK_ISSUE_COMMENTS="${MOCK_ISSUE_COMMENTS}"$'\x1e'"$2"
             shift 2
             continue
           fi

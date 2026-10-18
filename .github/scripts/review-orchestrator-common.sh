@@ -67,8 +67,9 @@ pr_comment_bodies_containing_marker() {
   local pull_number="$1"
   local marker="$2"
 
-  gh pr view "$pull_number" --json comments --jq \
-    --arg marker "$marker" '[.comments[].body | select(contains($marker))] | length' 2>/dev/null || printf '0'
+  gh pr view "$pull_number" --json comments 2>/dev/null \
+    | jq --arg marker "$marker" '[.comments[].body | select(contains($marker))] | length' \
+    || printf '0'
 }
 
 pr_has_marker_comment() {
@@ -86,8 +87,8 @@ find_independent_review_for_head_sha() {
   local pull_number="$1"
   local head_sha="$2"
 
-  gh api "repos/${GITHUB_REPOSITORY}/pulls/${pull_number}/reviews" --paginate \
-    --jq --arg head "$head_sha" '
+  gh api "repos/${GITHUB_REPOSITORY}/pulls/${pull_number}/reviews" --paginate 2>/dev/null \
+    | jq --arg head "$head_sha" '
       [.[]
         | select(.commit_id == $head)
         | select((.body // "") | length > 0)
@@ -96,19 +97,19 @@ find_independent_review_for_head_sha() {
             and ((.body // "") | contains("Independent ATTD PR Review"))
           )
       ] | length > 0
-    ' 2>/dev/null | grep -qx 'true'
+    ' | grep -qx 'true'
 }
 
 latest_marker_comment_created_epoch() {
   local pull_number="$1"
   local marker="$2"
 
-  gh pr view "$pull_number" --json comments --jq \
-    --arg marker "$marker" '
+  gh pr view "$pull_number" --json comments 2>/dev/null \
+    | jq -r --arg marker "$marker" '
       [.comments[]
         | select(.body | contains($marker))
         | .createdAt] | max // empty
-    ' 2>/dev/null
+    '
 }
 
 review_orchestrator_now_epoch() {
@@ -153,8 +154,8 @@ ${marker}"
 
   mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$pull_number" 2>/dev/null || true)
   for issue_number in "${linked_issues[@]}"; do
-    if gh issue view "$issue_number" --json comments --jq \
-      --arg marker "$marker" '[.comments[].body | select(contains($marker))] | length > 0' \
+    if gh issue view "$issue_number" --json comments 2>/dev/null \
+      | jq --arg marker "$marker" '[.comments[].body | select(contains($marker))] | length > 0' \
       | grep -qx 'true'; then
       continue
     fi
