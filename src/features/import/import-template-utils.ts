@@ -1,5 +1,5 @@
 /**
- * Shared import template utilities for all bulk import modules in ATTD CMS.
+ * Shared import template utilities for all bulk import modules in VNC OS admin.
  *
  * Convention: Any future bulk import module must include:
  * 1. Template download

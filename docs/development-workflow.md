@@ -7,6 +7,7 @@ Business requirement → specification → branch → implementation → CI → 
 - Link the work to a clear task/specification.
 - Define scope, acceptance criteria, out-of-scope items, data impact and risk level.
 - Inspect existing code before adding new abstractions.
+- For platform scope, data boundaries, and multi-site direction, read `docs/vnc-os-architecture.md`.
 
 ## During implementation
 - Work only on the task branch.

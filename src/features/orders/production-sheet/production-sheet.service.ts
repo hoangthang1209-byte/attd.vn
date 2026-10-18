@@ -118,7 +118,7 @@ function mapFileRow(
     sizeBytes: file.mediaAsset.sizeBytes,
     previewUrl,
     isPreviewable: previewable,
-    accessLabel: "Xem trong Bộ hồ sơ sản xuất trên ATTD Admin",
+    accessLabel: "Xem trong Bộ hồ sơ sản xuất trên VNC OS",
   };
 }
 

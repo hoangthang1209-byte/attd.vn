@@ -1,12 +1,12 @@
 # Implementation Guide
 
-This guide defines how future CMS/Admin UI work should adopt the ATTD CMS Design System.
+This guide defines how future CMS/Admin UI work should adopt the VNC CMS Design System.
 
 ## Required Sprint Opening
 
 Every future admin sprint must start with:
 
-> Before implementing, follow docs/cms-design-system as the authoritative ATTD CMS Design System. Do not invent new admin layouts, colors, spacing, components, or interaction patterns when an existing CMS standard exists. Public frontend UX is out of scope for this design system.
+> Before implementing, follow docs/cms-design-system as the authoritative VNC CMS Design System. Do not invent new admin layouts, colors, spacing, components, or interaction patterns when an existing CMS standard exists. Public frontend UX is out of scope for this design system.
 
 ## Folder Conventions
 

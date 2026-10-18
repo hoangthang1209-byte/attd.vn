@@ -161,10 +161,10 @@ describe("lean admin navigation", () => {
 });
 
 describe("admin document titles", () => {
-  it("uses ATTD Admin title template without duplication", () => {
-    assert.equal(ADMIN_DOCUMENT_TITLE, "ATTD Admin");
-    assert.equal(ADMIN_TITLE_TEMPLATE, "%s | ATTD Admin");
+  it("uses VNC OS title template without duplication", () => {
+    assert.equal(ADMIN_DOCUMENT_TITLE, "VNC OS");
+    assert.equal(ADMIN_TITLE_TEMPLATE, "%s | VNC OS");
     assert.deepEqual(adminPageMetadata("Khách hàng"), { title: "Khách hàng" });
-    assert.doesNotMatch(ADMIN_TITLE_TEMPLATE, /ATTD Admin \| ATTD Admin/);
+    assert.doesNotMatch(ADMIN_TITLE_TEMPLATE, /VNC OS \| VNC OS/);
   });
 });

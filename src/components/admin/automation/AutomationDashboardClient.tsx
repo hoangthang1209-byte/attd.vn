@@ -438,7 +438,7 @@ export default function AutomationDashboardClient() {
               />
               {data.agentSummary && data.agentSummary.length > 0 ? (
                 <section className="automation-agent-summary" aria-label="Tổng quan agent">
-                  <h2 className="admin-section-title">Agent OS (G1)</h2>
+                  <h2 className="admin-section-title">VNC Agent OS (G1)</h2>
                   {data.agentSummary.some((card) => card.isPartial) ||
                   data.dataCompleteness?.openTasksTruncated ? (
                     <p className="admin-error automation-lane-board__incompleteness" role="status">

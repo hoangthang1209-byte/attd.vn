@@ -49,8 +49,8 @@ function AdminLoginFormInner({ configWarning }: AdminLoginFormProps) {
   return (
     <div className="admin-login-page">
       <div className="admin-login-card">
-        <h1 className="admin-login-title">ATTD CMS</h1>
-        <p className="admin-field-hint">Đăng nhập quản trị</p>
+        <h1 className="admin-login-title">VNC OS</h1>
+        <p className="admin-field-hint">Vietnam Clothing Operating System — đăng nhập quản trị</p>
 
         {configWarning && <p className="admin-kb-warning">{configWarning}</p>}
 

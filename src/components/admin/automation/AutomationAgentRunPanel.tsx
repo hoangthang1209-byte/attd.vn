@@ -63,7 +63,7 @@ export default function AutomationAgentRunPanel({ issueNumber, active }: Props) 
 
   return (
     <div className="automation-agent-run-panel admin-panel">
-      <h3 className="admin-subsection-title">Agent OS — lịch sử chạy (G2)</h3>
+      <h3 className="admin-subsection-title">VNC Agent OS — lịch sử chạy (G2)</h3>
       {loading ? <p className="admin-muted">Đang tải lịch sử agent run…</p> : null}
       {error ? <p className="admin-error">{error}</p> : null}
       {!loading && !error && data && data.runs.length === 0 ? (

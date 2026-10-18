@@ -919,7 +919,7 @@ export function getAdminBreadcrumbMeta(pathname: string): AdminBreadcrumbMeta {
 
   return {
     breadcrumbs: ["Admin"],
-    title: "ATTD Admin",
-    description: "Quản trị dữ liệu, nội dung và vận hành nội bộ của ATTD.",
+    title: "VNC OS",
+    description: "Quản trị dữ liệu, nội dung và vận hành nội bộ trên VNC OS.",
   };
 }

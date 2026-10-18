@@ -52,7 +52,7 @@ describe("admin breadcrumb lean IA metadata", () => {
         ["CMS"],
         `${href} must not fall back to CMS breadcrumbs`,
       );
-      assert.notEqual(meta.title, "ATTD CMS", `${href} must not fall back to ATTD CMS title`);
+      assert.notEqual(meta.title, "VNC OS", `${href} must not fall back to generic VNC OS title`);
       assert.ok(
         APPROVED_DOMAINS.has(meta.breadcrumbs[0]),
         `${href} first breadcrumb "${meta.breadcrumbs[0]}" is not an approved domain`,
@@ -90,7 +90,7 @@ describe("admin breadcrumb lean IA metadata", () => {
   it("gives reviews and publishing CONTENT & SEO metadata", () => {
     const reviews = getAdminBreadcrumbMeta("/admin/content/reviews");
     assert.deepEqual(reviews.breadcrumbs, ["CONTENT & SEO", "Kiểm duyệt"]);
-    assert.notEqual(reviews.title, "ATTD CMS");
+    assert.notEqual(reviews.title, "VNC OS");
 
     const publishing = getAdminBreadcrumbMeta("/admin/content/publishing");
     assert.deepEqual(publishing.breadcrumbs, ["CONTENT & SEO", "Xuất bản"]);

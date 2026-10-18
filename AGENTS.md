@@ -7,7 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 # ATTD Engineering Rules
 
 ## Project
-- Product: ATTD Business OS / B2B sourcing platform.
+- Product: **VNC OS** (Vietnam Clothing Operating System) — company-wide operating platform for managed B2B sites (see `docs/vnc-os-architecture.md`). Public `attd.vn` remains an ATTD-branded managed site; do not conflate public ATTD marketing copy with the VNC OS admin/platform name.
 - Stack: Next.js App Router, TypeScript, Tailwind CSS, Prisma, Neon PostgreSQL, Vercel.
 - Code and technical comments: English.
 - User-facing UI and labels: Vietnamese unless the existing surface uses another language.

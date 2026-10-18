@@ -1,9 +1,12 @@
-# ATTD Agent OS — Phase G1 foundation
+# VNC Agent OS — Phase G1 foundation
 
-Phase G1 adds a **code-only Agent Registry**, conservative GitHub issue metadata parsing, a pure **CTO routing layer**, and read-only **Agent OS** surfaces on `/admin/automation`. It reuses the existing F1/F2 software factory (GitHub issues, BUILD_APPROVED gate, orchestrator queue, automation dashboard) without database migrations or business-logic changes.
+**VNC Agent OS** is the existing Agent OS module inside **VNC OS** (see `docs/vnc-os-architecture.md`). Do not build a second Agent OS.
+
+Phase G1 adds a **code-only Agent Registry**, conservative GitHub issue metadata parsing, a pure **CTO routing layer**, and read-only **VNC Agent OS** surfaces on `/admin/automation`. It reuses the existing F1/F2 software factory (GitHub issues, BUILD_APPROVED gate, orchestrator queue, automation dashboard) without database migrations or business-logic changes.
 
 Related docs:
 
+- `docs/vnc-os-architecture.md` (platform SSOT)
 - `docs/github-task-status.md` (F1a task status)
 - `docs/github-build-orchestrator.md` (F1b orchestrator)
 - `docs/github-automation-dashboard.md` (F2 dashboard)
@@ -100,7 +103,7 @@ Authorization, GitHub read tokens, and caching behavior are unchanged. No client
 
 - Preserves **one active Builder** queue and **BUILD_APPROVED** authorization.
 - No automatic merge, deploy, or agent-spawned shell processes.
-- No Prisma schema changes or production database writes from Agent OS code paths.
+- No Prisma schema changes or production database writes from VNC Agent OS code paths.
 - Does not modify pricing, payment, banking, auth, or permission **business logic**.
 
 ## Phase G2 — persistent execution state
@@ -126,7 +129,7 @@ Pure normalizers in `src/features/agent-os/agent-event.ingestion.ts` for GitHub 
 
 ### Admin visibility
 
-`/admin/automation` task details include **Agent OS — lịch sử chạy (G2)** via `GET /api/admin/automation/agent-runs?issueNumber=…` (same `dashboard.view` permission as the dashboard).
+`/admin/automation` task details include **VNC Agent OS — lịch sử chạy (G2)** via `GET /api/admin/automation/agent-runs?issueNumber=…` (same `dashboard.view` permission as the dashboard).
 
 ### Migration safety
 

@@ -1,6 +1,6 @@
 # Foundations
 
-These foundations define the shared visual language for ATTD CMS/Admin UI only.
+These foundations define the shared visual language for VNC OS / VNC CMS admin UI only.
 
 ## Colors and Tokens
 

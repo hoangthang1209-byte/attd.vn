@@ -1,6 +1,6 @@
-# ATTD CMS Design System
+# VNC CMS Design System (admin UX)
 
-This folder is the authoritative design authority for ATTD CMS/Admin user experience and interface work.
+This folder is the authoritative design authority for **VNC OS** admin / **VNC CMS** user experience and interface work.
 
 ## Scope
 
@@ -38,7 +38,7 @@ The CMS Design System does NOT govern public website frontend UX.
 
 ## Core Principle
 
-ATTD CMS is an operational system: fast, calm, clear, and consistent.
+VNC CMS admin surfaces are operational: fast, calm, clear, and consistent.
 
 Admin users should be able to scan records, make decisions, complete edits, and recover from mistakes without visual noise or unexpected interaction patterns.
 

@@ -1,7 +1,7 @@
-# ATTD Architecture Guardrails
+# Architecture Guardrails
 
 ## Purpose
-This document defines the minimum architectural guardrails for humans and coding agents working on ATTD Business OS.
+This document defines the minimum architectural guardrails for humans and coding agents working on **VNC OS** (Vietnam Clothing Operating System). Platform SSOT and multi-site boundaries: `docs/vnc-os-architecture.md`.
 
 ## Core architecture
 - Next.js App Router provides the web/admin application and server endpoints.

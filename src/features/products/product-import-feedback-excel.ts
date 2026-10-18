@@ -84,7 +84,7 @@ export async function generateProductImportFeedbackExcel(
   meta: FeedbackJobMeta,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "ATTD CMS";
+  workbook.creator = "VNC OS";
   workbook.created = new Date();
 
   const summarySheet = workbook.addWorksheet("Tổng quan");
