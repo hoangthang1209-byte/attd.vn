@@ -1,0 +1,37 @@
+name: Review Orchestrator — PR Events
+
+on:
+  pull_request:
+    types: [synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: review-orchestrator-pr-${{ github.event.pull_request.number }}-sha-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  on-head-change:
+    name: Record head and request review when CI is green
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Orchestrate independent review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_ACTION: ${{ github.event.action }}
+        run: |
+          source .github/scripts/review-orchestrator-common.sh
+          echo "PR #${PULL_NUMBER} ${PR_ACTION} at ${HEAD_SHA}."
+          handle_exact_head_review_orchestration "$PULL_NUMBER" "$HEAD_SHA" "pr-${PR_ACTION}"

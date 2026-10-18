@@ -541,6 +541,13 @@ handle_reviewer_outcome() {
     return 0
   fi
 
+  local current_head
+  current_head="$(gh pr view "$pull_number" --json headRefOid --jq '.headRefOid')"
+  if [ "$head_sha" != "$current_head" ]; then
+    echo "Stale independent review for ${head_sha}; current PR head is ${current_head}. Ignoring merge gate."
+    return 0
+  fi
+
   if ! is_low_risk_pull_request "$pull_number"; then
     echo "PR #${pull_number} is not low-risk; skipping auto-orchestration."
     post_unique_pr_comment "$pull_number" \

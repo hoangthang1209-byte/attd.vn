@@ -21,8 +21,20 @@ The owner does not need to manually post `BUILD_APPROVED` for each P2 repair ite
 | `build-orchestrator-pr-review.yml` | `pull_request_review` submitted | Parse ATTD PR Reviewer output and trigger repair / blocked / ready states |
 | `build-orchestrator-ci-failure.yml` | `CI` workflow completed with failure | Create/reuse one CI repair task for low-risk PRs |
 | `build-orchestrator-queue.yml` | cron + manual | Resume deferred repair tasks when no active Builder work remains |
+| `review-orchestrator-ci-success.yml` | `CI` workflow completed with success | Request exact-head Independent ATTD PR Review when factory PR CI is green |
+| `review-orchestrator-pr-events.yml` | PR `synchronize` / `ready_for_review` | Fast-path exact-head review request when CI is already green (no Draft→Ready dependency) |
+| `review-orchestrator-watchdog.yml` | cron + manual | Bounded retry + `REVIEW_ORCHESTRATOR_STALLED` / WAIT_HUMAN when review never arrives |
 
-Shared logic: `.github/scripts/build-orchestrator-common.sh`
+Shared logic: `.github/scripts/build-orchestrator-common.sh`, `.github/scripts/review-orchestrator-common.sh`
+
+### Exact-head independent review
+
+Factory pull requests (linked closing issues, non-draft, not high-risk without `HIGH_RISK_APPROVED`) use auditable PR comments:
+
+- `REQUEST_INDEPENDENT_REVIEW` — trigger token for the Cursor Independent ATTD PR Reviewer automation
+- `REVIEW_ORCHESTRATOR_IDEMPOTENCY: request|retry|stalled-pr-<number>-sha-<head>`
+
+Merge orchestration ignores independent reviews whose `commit_id` does not match the current PR head. Stale reviews never satisfy the merge gate.
 
 ## Reviewer-driven repair
 

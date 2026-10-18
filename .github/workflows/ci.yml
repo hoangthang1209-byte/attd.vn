@@ -89,10 +89,13 @@ jobs:
       - name: Orchestrator shell contract tests
         run: |
           bash -n .github/scripts/build-orchestrator-common.sh
+          bash -n .github/scripts/review-orchestrator-common.sh
           bash -n .github/scripts/task-status-common.sh
           for test_script in .github/scripts/build-orchestrator-*.test.sh; do
             bash "$test_script"
           done
+          bash .github/scripts/review-orchestrator-common.test.sh
+          bash .github/scripts/gh-cli-jq-syntax.test.sh
 
       - name: Tests
         run: npm test --if-present
