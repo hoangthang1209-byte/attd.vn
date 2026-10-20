@@ -23,6 +23,10 @@ export type AutomationFactoryLoopSnapshot = {
   retryCount: number;
   waitHuman: boolean;
   waitHumanReason: string | null;
+  workerLease: string | null;
+  leaseExpiresAt: string | null;
+  lastHeartbeatAt: string | null;
+  lastDispatchAt: string | null;
 };
 
 const STAGE_LABEL: Record<AutomationFactoryLoopStage, string> = {
@@ -63,6 +67,21 @@ function countReviewRequestMarkers(comments: readonly AutomationStatusComment[])
   ).length;
 }
 
+function parseBuilderLease(comments: readonly AutomationStatusComment[]) {
+  const lease = findLatestCommentMatching(comments, (body) => body.startsWith("BUILDER_LEASE:"));
+  const dispatch = findLatestCommentMatching(comments, (body) =>
+    body.includes("BUILDER_LIVENESS_REDISPATCH:"),
+  );
+  const body = lease?.body ?? "";
+  const read = (key: string) => body.match(new RegExp(`${key}=([^\\s]+)`))?.[1] ?? null;
+  return {
+    workerLease: lease ? body.split("\n")[0]?.trim() ?? null : null,
+    leaseExpiresAt: read("leaseExpiresAt"),
+    lastHeartbeatAt: read("heartbeat"),
+    lastDispatchAt: dispatch?.createdAt ?? null,
+  };
+}
+
 export function resolveAutomationFactoryLoopSnapshot(input: {
   status: NormalizedTaskStatus;
   comments: readonly AutomationStatusComment[];
@@ -71,6 +90,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
   reviewWaitHuman?: boolean;
   reviewStalledReason?: string | null;
 }): AutomationFactoryLoopSnapshot {
+  const builderLease = parseBuilderLease(input.comments);
   const waitHumanComment =
     findLatestCommentMatching(input.comments, (body) =>
       body.includes(CONTINUOUS_ORCHESTRATOR_STALLED_PREFIX),
@@ -92,6 +112,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
         input.reviewStalledReason ??
         waitHumanComment?.body.split("\n")[0]?.trim() ??
         "WAIT_HUMAN",
+      ...builderLease,
     };
   }
 
@@ -112,6 +133,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -125,6 +147,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -138,6 +161,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -151,6 +175,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -164,6 +189,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -177,6 +203,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -190,6 +217,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: countReviewRequestMarkers(input.comments),
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -203,6 +231,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -216,6 +245,7 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
       retryCount: 0,
       waitHuman: false,
       waitHumanReason: null,
+      ...builderLease,
     };
   }
 
@@ -228,5 +258,6 @@ export function resolveAutomationFactoryLoopSnapshot(input: {
     retryCount: 0,
     waitHuman: input.status === "blocked" || input.status === "stalled",
     waitHumanReason: input.status === "blocked" ? "Task bị chặn" : null,
+    ...builderLease,
   };
 }
