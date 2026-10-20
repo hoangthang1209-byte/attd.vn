@@ -760,6 +760,22 @@ function AutomationTaskDetails({
           <strong>Hành động tiếp theo:</strong> {task.factoryLoop.nextAction}
         </p>
       ) : null}
+      {task.factoryLoop.workerLease ? (
+        <p>
+          <strong>Builder lease:</strong> {task.factoryLoop.workerLease}
+        </p>
+      ) : null}
+      {task.factoryLoop.leaseExpiresAt ? (
+        <p>
+          <strong>Lease hết hạn:</strong> {formatQuoteDateTime(task.factoryLoop.leaseExpiresAt)}
+          {task.factoryLoop.lastHeartbeatAt
+            ? <> · Heartbeat: {formatQuoteDateTime(task.factoryLoop.lastHeartbeatAt)}</>
+            : null}
+          {task.factoryLoop.lastDispatchAt
+            ? <> · Dispatch gần nhất: {formatQuoteDateTime(task.factoryLoop.lastDispatchAt)}</>
+            : null}
+        </p>
+      ) : null}
       {task.factoryLoop.waitHumanReason ? (
         <p>
           <strong>Lý do WAIT_HUMAN:</strong> {task.factoryLoop.waitHumanReason}
