@@ -18,6 +18,9 @@ readonly CONTINUOUS_QUEUE_CLAIM_LABEL="orchestrator:queue-claim"
 readonly AUTOMATION_PRODUCTION_SMOKE_URL="${AUTOMATION_PRODUCTION_SMOKE_URL:-https://attd.vn/}"
 CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES="${CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES:-45}"
 CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES="${CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES:-30}"
+CONTINUOUS_SMOKE_TIMEOUT_MINUTES="${CONTINUOUS_SMOKE_TIMEOUT_MINUTES:-20}"
+CONTINUOUS_BUILDER_STALE_MINUTES="${CONTINUOUS_BUILDER_STALE_MINUTES:-15}"
+CONTINUOUS_BUILDER_MAX_REDISPATCH="${CONTINUOUS_BUILDER_MAX_REDISPATCH:-3}"
 
 continuous_orchestrator_marker() {
   local kind="$1"
@@ -69,7 +72,16 @@ is_factory_continuous_loop_pull_request() {
 pull_request_merge_state() {
   local pull_number="$1"
   gh pr view "$pull_number" --json mergeable,mergeStateStatus,reviewDecision,statusCheckRollup \
-    --jq '[.mergeable, .mergeStateStatus, .reviewDecision, (.statusCheckRollup.state // "UNKNOWN")] | @tsv'
+    | jq -r '
+      def check_state:
+        (.statusCheckRollup // []) as $checks
+        | if ($checks | length) == 0 then "UNKNOWN"
+          elif any($checks[]; ((.status // "") != "COMPLETED")) then "PENDING"
+          elif any($checks[]; ((.conclusion // "") | IN("SUCCESS","NEUTRAL","SKIPPED") | not)) then "FAILURE"
+          else "SUCCESS"
+          end;
+      [.mergeable, .mergeStateStatus, (.reviewDecision // ""), check_state] | @tsv
+    '
 }
 
 pull_request_has_ready_to_merge_for_head() {
@@ -206,12 +218,22 @@ attempt_auto_merge_for_head() {
 
 github_production_deployment_sha() {
   local merge_sha="$1"
-  gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=Production&per_page=30" 2>/dev/null \
-    | jq -r --arg sha "$merge_sha" '
-      [.[] | select(.environment == "Production" or .environment == "production")
-        | select(.sha == $sha)
-        | .sha][0] // empty
-    ' || true
+  local deployment_id deployment_state
+  while IFS= read -r deployment_id; do
+    [ -z "$deployment_id" ] && continue
+    deployment_state="$(gh api "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses?per_page=1" \
+      --jq '.[0].state // empty' 2>/dev/null || true)"
+    if [ "$deployment_state" = "success" ]; then
+      printf '%s' "$merge_sha"
+      return 0
+    fi
+  done < <(
+    gh api "repos/${GITHUB_REPOSITORY}/deployments?environment=Production&per_page=30" 2>/dev/null \
+      | jq -r --arg sha "$merge_sha" '
+          .[] | select((.environment == "Production" or .environment == "production") and .sha == $sha) | .id
+        ' || true
+  )
+  return 0
 }
 
 main_branch_ci_success_for_sha() {
@@ -226,6 +248,29 @@ run_production_smoke_check() {
   local code
   code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 30 "$url" 2>/dev/null || printf '000')"
   [ "$code" = "200" ] || [ "$code" = "301" ] || [ "$code" = "302" ]
+}
+
+continuous_elapsed_minutes_since_merge() {
+  local pull_number="$1"
+  local merged_at merged_epoch now_epoch
+  merged_at="$(gh pr view "$pull_number" --json mergedAt --jq '.mergedAt // empty' 2>/dev/null || true)"
+  merged_epoch="$(date -u -d "$merged_at" +%s 2>/dev/null || printf '0')"
+  now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
+  if [ "$merged_epoch" -le 0 ] || [ "$now_epoch" -le "$merged_epoch" ]; then
+    printf '0'
+    return 0
+  fi
+  printf '%s' "$(( (now_epoch - merged_epoch) / 60 ))"
+}
+
+mark_continuous_stalled() {
+  local pull_number="$1"
+  local sha="$2"
+  local reason="$3"
+  local marker
+  marker="$(continuous_orchestrator_marker "stalled" "$pull_number" "$sha")"
+  post_continuous_pr_comment "$pull_number" "$marker" "${CONTINUOUS_ORCHESTRATOR_STALLED_PREFIX} ${reason} WAIT_HUMAN."
+  set_linked_issues_status "$pull_number" "status:stalled"
 }
 
 handle_post_merge_verification() {
@@ -243,7 +288,13 @@ handle_post_merge_verification() {
   set_linked_issues_status "$pull_number" "status:verifying"
 
   if ! main_branch_ci_success_for_sha "$merge_sha"; then
-    echo "Main CI not green yet for merge SHA ${merge_sha} (${source}); waiting."
+    local ci_elapsed
+    ci_elapsed="$(continuous_elapsed_minutes_since_merge "$pull_number")"
+    if [ "$ci_elapsed" -ge "$CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES" ]; then
+      mark_continuous_stalled "$pull_number" "$merge_sha" "Main CI did not become green within ${CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES} minutes for \`${merge_sha}\`."
+      return 0
+    fi
+    echo "Main CI not green yet for merge SHA ${merge_sha} (${source}); waiting (${ci_elapsed}m)."
     return 0
   fi
 
@@ -278,7 +329,13 @@ handle_post_merge_verification() {
 
   if ! pr_has_marker_comment "$pull_number" "$smoke_marker"; then
     if ! run_production_smoke_check "$AUTOMATION_PRODUCTION_SMOKE_URL"; then
-      echo "Production smoke check failed for ${AUTOMATION_PRODUCTION_SMOKE_URL}; waiting."
+      local smoke_elapsed
+      smoke_elapsed="$(continuous_elapsed_minutes_since_merge "$pull_number")"
+      if [ "$smoke_elapsed" -ge "$CONTINUOUS_SMOKE_TIMEOUT_MINUTES" ]; then
+        mark_continuous_stalled "$pull_number" "$merge_sha" "Production smoke did not pass within ${CONTINUOUS_SMOKE_TIMEOUT_MINUTES} minutes for \`${merge_sha}\`."
+        return 0
+      fi
+      echo "Production smoke check failed for ${AUTOMATION_PRODUCTION_SMOKE_URL}; waiting (${smoke_elapsed}m)."
       return 0
     fi
     post_continuous_pr_comment "$pull_number" "$smoke_marker" \
@@ -330,8 +387,9 @@ ${claim_marker}"
 
 select_next_claimable_agent_os_issue() {
   local completed_pull_number="$1"
-  local issue_json issue_number
+  local completed_issues candidate issue_json
 
+  completed_issues="$(linked_issue_numbers_from_pr "$completed_pull_number" 2>/dev/null | paste -sd, - || true)"
   issue_json="$(gh issue list \
     --repo "$GITHUB_REPOSITORY" \
     --state open \
@@ -339,15 +397,146 @@ select_next_claimable_agent_os_issue() {
     --json number,labels,title \
     --limit 50 2>/dev/null || printf '[]')"
 
-  issue_number="$(printf '%s' "$issue_json" | jq -r --argjson skip "$completed_pull_number" '
-    [.[] | select(.number != $skip)
-      | select([.labels[].name] | any(. == "risk:low" or . == "risk:medium"))
-      | select([.labels[].name] | all(. != "orchestrator:review-repair" and . != "orchestrator:ci-repair"))
-      | select([.labels[].name] | all(. != "status:building" and . != "status:pr-open" and . != "status:completed"))
-    ] | sort_by(.number) | .[0].number // empty
-  ')"
+  while IFS= read -r candidate; do
+    [ -z "$candidate" ] && continue
+    if printf ',%s,' "$completed_issues" | grep -Fq ",$candidate,"; then
+      continue
+    fi
+    if issue_is_safe_claim_candidate "$candidate"; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done < <(
+    printf '%s' "$issue_json" | jq -r '
+      [.[] 
+        | select([.labels[].name] | any(. == "risk:low" or . == "risk:medium"))
+        | select([.labels[].name] | all(. != "orchestrator:review-repair" and . != "orchestrator:ci-repair"))
+        | select([.labels[].name] | all(. != "status:building" and . != "status:pr-open" and . != "status:completed"))
+      ] | sort_by(.number) | .[].number
+    '
+  )
+}
 
-  printf '%s' "$issue_number"
+issue_has_unresolved_dependencies() {
+  local issue_number="$1"
+  local body dep state
+  body="$(gh issue view "$issue_number" --json body --jq '.body // ""' 2>/dev/null || true)"
+  while IFS= read -r dep; do
+    [ -z "$dep" ] && continue
+    state="$(gh issue view "$dep" --json state --jq '.state' 2>/dev/null || printf 'OPEN')"
+    if [ "$state" != "CLOSED" ]; then
+      return 0
+    fi
+  done < <(printf '%s\n' "$body" | grep -Eio '(depends on|blocked by)[[:space:]]+#([0-9]+)' | grep -Eo '[0-9]+' || true)
+  return 1
+}
+
+issue_is_safe_claim_candidate() {
+  local issue_number="$1"
+  if is_high_risk_issue "$issue_number"; then
+    return 1
+  fi
+  if issue_has_unresolved_dependencies "$issue_number"; then
+    return 1
+  fi
+  return 0
+}
+
+process_stale_builder_tasks() {
+  local now_epoch issue_number updated_at updated_epoch age retry_count
+  now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
+  while IFS=
+  local pull_number
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:ready-to-merge"; then
+      attempt_auto_merge_for_head "$pull_number" "$(pull_request_head_sha "$pull_number")" "watchdog-merge"
+    fi
+  done < <(list_open_factory_pull_requests)
+}
+
+issue_has_label_for_pr() {
+  local pull_number="$1"
+  local label="$2"
+  local issue_number
+
+  mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$pull_number" 2>/dev/null || true)
+  for issue_number in "${linked_issues[@]}"; do
+    if issue_has_label "$issue_number" "$label"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+process_continuous_post_merge_watchdog() {
+  local pull_number merge_sha merged_at
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    merged_at="$(gh pr view "$pull_number" --json mergedAt --jq '.mergedAt // empty')"
+    [ -z "$merged_at" ] && continue
+    merge_sha="$(gh pr view "$pull_number" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+    [ -z "$merge_sha" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:completed"; then
+      continue
+    fi
+    handle_post_merge_verification "$pull_number" "$merge_sha" "watchdog-verify"
+  done < <(
+    gh pr list --repo "$GITHUB_REPOSITORY" --state merged --limit 30 --json number,mergedAt \
+      --jq 'sort_by(.mergedAt) | reverse | .[].number' 2>/dev/null || true
+  )
+}
+
+process_continuous_orchestrator_watchdog() {
+  ensure_continuous_orchestrator_labels
+  process_stale_builder_tasks
+  process_continuous_merge_candidates
+  process_continuous_post_merge_watchdog
+  process_deferred_queue
+}
+
+handle_continuous_merge_orchestration() {
+  local pull_number="$1"
+  local head_sha="$2"
+  local source="${3:-review-outcome}"
+  attempt_auto_merge_for_head "$pull_number" "$head_sha" "$source"
+}
+
+handle_continuous_pr_merged_event() {
+  local pull_number="$1"
+  local merge_sha="$2"
+  set_linked_issues_status "$pull_number" "status:merged"
+  handle_post_merge_verification "$pull_number" "$merge_sha" "pr-merged-event"
+}
+\t' read -r issue_number updated_at; do
+    [ -z "$issue_number" ] && continue
+    updated_epoch="$(date -u -d "$updated_at" +%s 2>/dev/null || printf '0')"
+    [ "$updated_epoch" -le 0 ] && continue
+    age="$(( (now_epoch - updated_epoch) / 60 ))"
+    [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && continue
+
+    retry_count="$(gh issue view "$issue_number" --json comments --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' 2>/dev/null || printf '0')"
+    if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
+      gh issue comment "$issue_number" --body "CONTINUOUS_ORCHESTRATOR_STALLED: Builder produced no progress after ${retry_count} redispatch attempts. WAIT_HUMAN."
+      set_issue_status_label "$issue_number" "status:stalled"
+      continue
+    fi
+
+    gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: stale BUILDING detected after ${age} minutes; redispatch attempt $((retry_count + 1))/${CONTINUOUS_BUILDER_MAX_REDISPATCH}."
+    gh issue comment "$issue_number" --body "BUILD_APPROVED"
+    echo "Redispatched stale Builder issue #${issue_number}."
+  done < <(
+    gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "status:building" \
+      --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
+  )
 }
 
 process_continuous_merge_candidates() {
