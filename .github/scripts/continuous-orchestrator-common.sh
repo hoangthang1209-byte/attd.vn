@@ -21,6 +21,7 @@ CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES="${CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES:-30}"
 CONTINUOUS_SMOKE_TIMEOUT_MINUTES="${CONTINUOUS_SMOKE_TIMEOUT_MINUTES:-20}"
 CONTINUOUS_BUILDER_STALE_MINUTES="${CONTINUOUS_BUILDER_STALE_MINUTES:-15}"
 CONTINUOUS_BUILDER_MAX_REDISPATCH="${CONTINUOUS_BUILDER_MAX_REDISPATCH:-3}"
+CONTINUOUS_BUILDER_LEASE_MINUTES="${CONTINUOUS_BUILDER_LEASE_MINUTES:-20}"
 
 continuous_orchestrator_marker() {
   local kind="$1"
@@ -442,7 +443,58 @@ issue_is_safe_claim_candidate() {
   return 0
 }
 
-process_stale_builder_tasks() {
+
+builder_lease_marker() {
+  local issue_number="$1"
+  local pull_number="$2"
+  local head_sha="$3"
+  local attempt="$4"
+  local claimed_at lease_expires_at
+  claimed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  lease_expires_at="$(date -u -d "+$CONTINUOUS_BUILDER_LEASE_MINUTES minutes" +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'BUILDER_LEASE: issue=%s pr=%s head=%s claimedAt=%s leaseExpiresAt=%s attempt=%s stage=BUILDING heartbeat=%s' "$issue_number" "$pull_number" "$head_sha" "$claimed_at" "$lease_expires_at" "$attempt" "$claimed_at"
+}
+
+find_open_pr_for_issue() {
+  local issue_number="$1"
+  gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,body,headRefName,headRefOid,isDraft,mergeStateStatus,updatedAt     | jq -r --arg issue "#$issue_number" '[.[] | select((.body // "") | contains($issue))] | sort_by(.updatedAt) | reverse | .[0] | if . == null then empty else [.number,.headRefName,.headRefOid,(.isDraft|tostring),(.mergeStateStatus // "UNKNOWN"),.updatedAt] | @tsv end' 2>/dev/null || true
+}
+
+record_builder_lease() {
+  local issue_number="$1"
+  local pull_number="$2"
+  local head_sha="$3"
+  local attempt="$4"
+  gh issue comment "$issue_number" --body "$(builder_lease_marker "$issue_number" "$pull_number" "$head_sha" "$attempt")"
+}
+
+latest_builder_lease_expiry() {
+  local issue_number="$1"
+  gh issue view "$issue_number" --json comments     | jq -r '[.comments[].body | select(startswith("BUILDER_LEASE:"))] | last // "" | capture("leaseExpiresAt=(?<expiry>[^ ]+)").expiry // empty' 2>/dev/null || true
+}
+
+builder_lease_is_active() {
+  local issue_number="$1"
+  local expiry expiry_epoch now_epoch
+  expiry="$(latest_builder_lease_expiry "$issue_number")"
+  [ -z "$expiry" ] && return 1
+  expiry_epoch="$(date -u -d "$expiry" +%s 2>/dev/null || printf '0')"
+  now_epoch="$CONTINUOUS_NOW_EPOCH"
+  [ -z "$now_epoch" ] && now_epoch="$(date -u +%s)"
+  [ "$expiry_epoch" -gt "$now_epoch" ]
+}
+
+reconcile_builder_issue() {
+  local issue_number="$1"
+  local issue_updated_at="$2"
+  local now_epoch="$3"
+  local pr_data pull_number branch_name head_sha is_draft merge_state pr_updated_at
+  local progress_at progress_epoch age retry_count next_attempt reason
+
+  pr_data="$(find_open_pr_for_issue "$issue_number")"
+  pull_number="none"; branch_name="none"; head_sha="none"; is_draft="false"; merge_state="UNKNOWN"; pr_updated_at="$issue_updated_at"
+  if [ -n "$pr_data" ]; then
+    IFS=
   local now_epoch issue_number updated_at updated_epoch age retry_count
   now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
 
@@ -470,6 +522,128 @@ process_stale_builder_tasks() {
     gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "status:building" \
       --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
   )
+}
+
+process_continuous_merge_candidates() {
+  local pull_number
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:ready-to-merge"; then
+      attempt_auto_merge_for_head "$pull_number" "$(pull_request_head_sha "$pull_number")" "watchdog-merge"
+    fi
+  done < <(list_open_factory_pull_requests)
+}
+
+issue_has_label_for_pr() {
+  local pull_number="$1"
+  local label="$2"
+  local issue_number
+
+  mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$pull_number" 2>/dev/null || true)
+  for issue_number in "${linked_issues[@]}"; do
+    if issue_has_label "$issue_number" "$label"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+process_continuous_post_merge_watchdog() {
+  local pull_number merge_sha merged_at
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    merged_at="$(gh pr view "$pull_number" --json mergedAt --jq '.mergedAt // empty')"
+    [ -z "$merged_at" ] && continue
+    merge_sha="$(gh pr view "$pull_number" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+    [ -z "$merge_sha" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:completed"; then
+      continue
+    fi
+    handle_post_merge_verification "$pull_number" "$merge_sha" "watchdog-verify"
+  done < <(
+    gh pr list --repo "$GITHUB_REPOSITORY" --state merged --limit 30 --json number,mergedAt \
+      --jq 'sort_by(.mergedAt) | reverse | .[].number' 2>/dev/null || true
+  )
+}
+
+process_continuous_orchestrator_watchdog() {
+  ensure_continuous_orchestrator_labels
+  process_stale_builder_tasks
+  process_continuous_merge_candidates
+  process_continuous_post_merge_watchdog
+  process_deferred_queue
+}
+
+handle_continuous_merge_orchestration() {
+  local pull_number="$1"
+  local head_sha="$2"
+  local source="${3:-review-outcome}"
+  attempt_auto_merge_for_head "$pull_number" "$head_sha" "$source"
+}
+
+handle_continuous_pr_merged_event() {
+  local pull_number="$1"
+  local merge_sha="$2"
+  set_linked_issues_status "$pull_number" "status:merged"
+  handle_post_merge_verification "$pull_number" "$merge_sha" "pr-merged-event"
+}
+\t' read -r pull_number branch_name head_sha is_draft merge_state pr_updated_at <<< "$pr_data"
+  fi
+
+  progress_at="$issue_updated_at"
+  if [ -n "$pr_updated_at" ] && [[ "$pr_updated_at" > "$progress_at" ]]; then progress_at="$pr_updated_at"; fi
+  progress_epoch="$(date -u -d "$progress_at" +%s 2>/dev/null || printf '0')"
+  [ "$progress_epoch" -le 0 ] && return 0
+  age="$(( (now_epoch - progress_epoch) / 60 ))"
+  [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && return 0
+  if builder_lease_is_active "$issue_number"; then return 0; fi
+
+  retry_count="$(gh issue view "$issue_number" --json comments --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' 2>/dev/null || printf '0')"
+  if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
+    if ! issue_has_idempotency_marker "$issue_number" "BUILDER_LIVENESS_EXHAUSTED:"; then
+      gh issue comment "$issue_number" --body "BUILDER_LIVENESS_EXHAUSTED: no code/PR progress after $retry_count recovery attempts. CONTINUOUS_ORCHESTRATOR_STALLED: WAIT_HUMAN."
+    fi
+    set_issue_status_label "$issue_number" "status:stalled"
+    return 0
+  fi
+
+  next_attempt="$((retry_count + 1))"
+  reason="stale task for $age minutes"
+  [ "$merge_state" = "DIRTY" ] && reason="merge conflict on PR #$pull_number"
+  [ "$merge_state" = "BEHIND" ] && reason="PR #$pull_number behind main"
+  [ "$is_draft" = "true" ] && reason="draft PR #$pull_number has no recent progress"
+  [ "$pull_number" = "none" ] && reason="no open PR and no recent progress"
+
+  gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: $reason; same-task recovery attempt $next_attempt/$CONTINUOUS_BUILDER_MAX_REDISPATCH. pr=$pull_number branch=$branch_name head=$head_sha. Resume SAME branch/PR, reconcile latest main if behind/conflicted, push code progress, then CI/review."
+  record_builder_lease "$issue_number" "$pull_number" "$head_sha" "$next_attempt"
+  gh issue comment "$issue_number" --body "BUILD_APPROVED"
+}
+
+process_stale_builder_tasks() {
+  local now_epoch issue_number updated_at label
+  local -A seen=()
+  now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
+
+  for label in "status:approved" "status:building"; do
+    while IFS=$'\t' read -r issue_number updated_at; do
+      [ -z "$issue_number" ] && continue
+      [ -n "${seen[$issue_number]:-}" ] && continue
+      seen[$issue_number]=1
+      if issue_excluded_from_active_builder_count "$issue_number"; then continue; fi
+      if is_high_risk_issue "$issue_number"; then continue; fi
+      reconcile_builder_issue "$issue_number" "$updated_at" "$now_epoch"
+    done < <(
+      gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "$label"         --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
+    )
+  done
 }
 
 process_continuous_merge_candidates() {
