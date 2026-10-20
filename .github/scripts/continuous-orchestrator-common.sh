@@ -479,7 +479,7 @@ builder_lease_is_active() {
   expiry="$(latest_builder_lease_expiry "$issue_number")"
   [ -z "$expiry" ] && return 1
   expiry_epoch="$(date -u -d "$expiry" +%s 2>/dev/null || printf '0')"
-  now_epoch="$CONTINUOUS_NOW_EPOCH"
+  now_epoch="${CONTINUOUS_NOW_EPOCH:-}"
   [ -z "$now_epoch" ] && now_epoch="$(date -u +%s)"
   [ "$expiry_epoch" -gt "$now_epoch" ]
 }
