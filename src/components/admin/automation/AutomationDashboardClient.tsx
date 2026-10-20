@@ -48,7 +48,9 @@ import {
   needsActiveLaneSeed,
   resolveManualRefreshTargets,
 } from "@/features/automation/automation-dashboard-lane-cache";
+import { formatFactoryLoopStageLabel } from "@/features/automation/automation-factory-loop";
 import { formatShortCommitSha } from "@/features/automation/automation-production";
+import { derivePullRequestVerificationDisplay } from "@/features/automation/automation-pull-request-verification";
 import { formatQuoteDateTime } from "@/features/quotes/format";
 
 const AUTO_REFRESH_INTERVAL_MS = 45_000;
@@ -743,6 +745,27 @@ function AutomationTaskDetails({
         ) : null}
       </p>
       <p>
+        <strong>Agent OS loop:</strong> {formatFactoryLoopStageLabel(task.factoryLoop.stage)}
+        {task.factoryLoop.exactHeadSha ? (
+          <> · Head SHA: {formatShortCommitSha(task.factoryLoop.exactHeadSha)}</>
+        ) : null}
+        {task.factoryLoop.productionVerificationSha ? (
+          <> · Production verify SHA: {formatShortCommitSha(task.factoryLoop.productionVerificationSha)}</>
+        ) : null}
+        {task.factoryLoop.retryCount > 0 ? <> · Retry: {task.factoryLoop.retryCount}</> : null}
+        {task.factoryLoop.waitHuman ? <> · WAIT_HUMAN</> : null}
+      </p>
+      {task.factoryLoop.nextAction ? (
+        <p>
+          <strong>Hành động tiếp theo:</strong> {task.factoryLoop.nextAction}
+        </p>
+      ) : null}
+      {task.factoryLoop.waitHumanReason ? (
+        <p>
+          <strong>Lý do WAIT_HUMAN:</strong> {task.factoryLoop.waitHumanReason}
+        </p>
+      ) : null}
+      <p>
         <strong>Production:</strong>{" "}
         {AUTOMATION_PRODUCTION_STATUS_LABELS[task.productionStatus.status]}
         {task.productionStatus.mergedCommitSha ? (
@@ -781,8 +804,8 @@ function AutomationTaskDetails({
         </p>
       )}
       <p>
-        <strong>Trạng thái CI / Review:</strong> {task.statusLabel ?? "—"}
-        {task.status === "ready_to_merge" ? " · Sẵn sàng merge" : ""}
+        <strong>Trạng thái CI / Review:</strong>{" "}
+        {derivePullRequestVerificationDisplay(task) ?? task.statusLabel ?? "—"}
       </p>
       <p>
         <strong>Điểm chặn:</strong> {task.blockerReason ?? "Không có"}
