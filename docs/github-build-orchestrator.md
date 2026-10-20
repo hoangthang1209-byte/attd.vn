@@ -12,7 +12,7 @@ For **low-risk** tasks only:
 
 The owner does not need to manually post `BUILD_APPROVED` for each P2 repair iteration when orchestration handles it.
 
-**Never auto-merges. Never deploys production. Never uses Cursor credentials in the repo.**
+**Continuous loop (issue #218):** for eligible low/medium-risk factory tasks, GitHub Actions may auto-merge at the exact PR head, verify production deployment SHA, run a safe smoke check, mark `status:completed`, and claim the next queued task — still subject to branch protection, exact-head review, CI, and high-risk gates. **Never uses Cursor credentials in the repo.**
 
 ## Workflows
 
@@ -24,8 +24,10 @@ The owner does not need to manually post `BUILD_APPROVED` for each P2 repair ite
 | `review-orchestrator-ci-success.yml` | `CI` workflow completed with success | Request exact-head Independent ATTD PR Review when factory PR CI is green |
 | `review-orchestrator-pr-events.yml` | PR `synchronize` / `ready_for_review` | Fast-path exact-head review request when CI is already green (no Draft→Ready dependency) |
 | `review-orchestrator-watchdog.yml` | cron + manual | Bounded retry + `REVIEW_ORCHESTRATOR_STALLED` / WAIT_HUMAN when review never arrives |
+| `continuous-orchestrator-watchdog.yml` | cron + manual | Auto-merge, post-merge production verify, smoke, next-task claim |
+| `continuous-orchestrator-pr-merged.yml` | PR merged | Fast-path production verification after merge |
 
-Shared logic: `.github/scripts/build-orchestrator-common.sh`, `.github/scripts/review-orchestrator-common.sh`
+Shared logic: `.github/scripts/build-orchestrator-common.sh`, `.github/scripts/review-orchestrator-common.sh`, `.github/scripts/continuous-orchestrator-common.sh`
 
 ### Exact-head independent review
 
@@ -120,7 +122,7 @@ Orchestration **never auto-advances** when:
 - Linked issue lacks `risk:low` (CI/repair automation requires explicit low-risk label)
 - Issue text matches high-risk domains (pricing, payment, banking, SePay, auth, permissions, invoices, accounting, destructive migrations, bulk rewrites/deletes) unless `HIGH_RISK_APPROVED` is present in the issue
 
-No auto-merge. No production deployment. No paid Cursor on-demand escalation.
+Auto-merge and production verification apply only to the continuous orchestrator path (low/medium-risk factory tasks) and never bypass high-risk gates or branch protection. No paid Cursor on-demand escalation.
 
 ## Labels
 
