@@ -10,6 +10,7 @@ import {
   resolveMergeTimestamp,
 } from "@/features/automation/automation-status.parser";
 import { createInitialProductionStatus } from "@/features/automation/automation-production";
+import { resolveAutomationFactoryLoopSnapshot } from "@/features/automation/automation-factory-loop";
 import { routeAutomationTask } from "@/features/agent-os/agent-router";
 import type {
   AutomationDashboardView,
@@ -19,6 +20,18 @@ import type {
   AutomationTaskSummary,
 } from "@/features/automation/automation-task.types";
 import type { GitHubIssuePayload } from "@/features/automation/automation-github.types";
+
+export function attachFactoryLoopSnapshot(task: AutomationTask): AutomationTask {
+  const factoryLoop = resolveAutomationFactoryLoopSnapshot({
+    status: task.status,
+    comments: task.recentStatusComments,
+    linkedHeadSha: task.linkedPullRequest?.verification?.headSha ?? null,
+    linkedMergeCommitSha: task.linkedPullRequest?.mergeCommitSha ?? null,
+    reviewWaitHuman: task.linkedPullRequest?.verification?.waitHuman,
+    reviewStalledReason: task.linkedPullRequest?.verification?.reviewStalledReason ?? null,
+  });
+  return { ...task, factoryLoop };
+}
 
 export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
   const checkedAt = new Date().toISOString();
@@ -39,7 +52,7 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     risk,
   });
 
-  return {
+  return attachFactoryLoopSnapshot({
     issueNumber: issue.number,
     title: issue.title,
     taskArea,
@@ -72,7 +85,8 @@ export function mapIssueToTask(issue: GitHubIssuePayload): AutomationTask {
     },
     taskPriority: routing.effectivePriority,
     parentTaskIssueNumber: routing.metadata.parentTaskIssueNumber,
-  };
+    factoryLoop: resolveAutomationFactoryLoopSnapshot({ status, comments: [] }),
+  });
 }
 
 function partialMetric(value: number, isPartial: boolean): AutomationSummaryMetric {
