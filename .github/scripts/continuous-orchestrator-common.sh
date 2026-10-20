@@ -247,16 +247,27 @@ handle_post_merge_verification() {
     return 0
   fi
 
-  local production_sha
+  local production_sha merged_at merged_epoch now_epoch verify_elapsed stall_marker
   production_sha="$(github_production_deployment_sha "$merge_sha")"
-  if [ -z "$production_sha" ]; then
-    if gh api "repos/${GITHUB_REPOSITORY}/compare/${merge_sha}...${merge_sha}" --jq '.status' 2>/dev/null | grep -Eq '^(identical|ahead)$'; then
-      production_sha="$merge_sha"
-    fi
-  fi
 
   if [ "$production_sha" != "$merge_sha" ]; then
-    echo "Production deployment SHA mismatch for ${merge_sha} (production=${production_sha:-none})."
+    merged_at="$(gh pr view "$pull_number" --json mergedAt --jq '.mergedAt // empty' 2>/dev/null || true)"
+    merged_epoch="$(date -u -d "$merged_at" +%s 2>/dev/null || printf '0')"
+    now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
+    verify_elapsed=0
+    if [ "$merged_epoch" -gt 0 ] && [ "$now_epoch" -gt "$merged_epoch" ]; then
+      verify_elapsed="$(( (now_epoch - merged_epoch) / 60 ))"
+    fi
+
+    if [ "$verify_elapsed" -ge "$CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES" ]; then
+      stall_marker="$(continuous_orchestrator_marker "stalled" "$pull_number" "$merge_sha")"
+      post_continuous_pr_comment "$pull_number" "$stall_marker" \
+        "${CONTINUOUS_ORCHESTRATOR_STALLED_PREFIX} Production exact-SHA verification timed out after ${CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES} minutes for \`${merge_sha}\` (observed=\`${production_sha:-none}\`). WAIT_HUMAN."
+      set_linked_issues_status "$pull_number" "status:stalled"
+      return 0
+    fi
+
+    echo "Production deployment SHA mismatch for ${merge_sha} (production=${production_sha:-none}); waiting (${verify_elapsed}m)."
     return 0
   fi
 
