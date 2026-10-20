@@ -44,3 +44,6 @@ jobs:
           reviewed_sha="$(resolve_reviewed_sha "$REVIEWED_SHA" "$PR_HEAD_SHA")"
           echo "Using reviewed SHA ${reviewed_sha} (PR head: ${PR_HEAD_SHA})."
           handle_reviewer_outcome "$PULL_NUMBER" "$reviewed_sha" "$review_body" "$RUN_ID"
+
+          source .github/scripts/continuous-orchestrator-common.sh
+          handle_continuous_merge_orchestration "$PULL_NUMBER" "$reviewed_sha" "pr-review-event"
