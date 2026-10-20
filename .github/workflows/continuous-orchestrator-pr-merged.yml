@@ -1,0 +1,31 @@
+name: Continuous Orchestrator — PR Merged
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  verify-production-and-complete:
+    name: Post-merge production verify and complete loop
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ github.event.pull_request.merged == true }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run post-merge verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+          PULL_NUMBER: ${{ github.event.pull_request.number }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          source .github/scripts/continuous-orchestrator-common.sh
+          handle_continuous_pr_merged_event "$PULL_NUMBER" "$MERGE_SHA"
