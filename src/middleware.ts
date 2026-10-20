@@ -42,6 +42,17 @@ function tryQuotePublicLinkRewrite(request: NextRequest): NextResponse | null {
 }
 
 export async function middleware(request: NextRequest) {
+  // VNC OS uses the existing ATTD admin routes and session logic.
+  // Only the landing URL is adapted; no database, permission or module migrations.
+  const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "")
+    .split(":")[0].toLowerCase();
+  if (host === "os.vietnamclothing.vn" && request.nextUrl.pathname === "/") {
+    const dashboardUrl = request.nextUrl.clone();
+    dashboardUrl.pathname = "/admin/dashboard";
+    dashboardUrl.search = "";
+    return NextResponse.redirect(dashboardUrl);
+  }
+
   const quoteRewrite = tryQuotePublicLinkRewrite(request);
   if (quoteRewrite) return quoteRewrite;
 
