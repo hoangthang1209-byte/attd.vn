@@ -264,7 +264,7 @@ is_low_risk_pull_request() {
     fi
 
     if issue_has_label "$issue_number" "risk:medium"; then
-      return 1
+      continue
     fi
 
     return 1
