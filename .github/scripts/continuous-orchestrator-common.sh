@@ -446,4 +446,100 @@ process_stale_builder_tasks() {
   local now_epoch issue_number updated_at updated_epoch age retry_count
   now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
 
-  while IFS=$'
+  while IFS=$'\t' read -r issue_number updated_at; do
+    [ -z "$issue_number" ] && continue
+    updated_epoch="$(date -u -d "$updated_at" +%s 2>/dev/null || printf '0')"
+    [ "$updated_epoch" -le 0 ] && continue
+    age="$(( (now_epoch - updated_epoch) / 60 ))"
+    [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && continue
+
+    retry_count="$(gh issue view "$issue_number" --json comments \
+      --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' \
+      2>/dev/null || printf '0')"
+
+    if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
+      gh issue comment "$issue_number" --body "CONTINUOUS_ORCHESTRATOR_STALLED: Builder produced no progress after ${retry_count} redispatch attempts. WAIT_HUMAN."
+      set_issue_status_label "$issue_number" "status:stalled"
+      continue
+    fi
+
+    gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: stale BUILDING detected after ${age} minutes; redispatch attempt $((retry_count + 1))/${CONTINUOUS_BUILDER_MAX_REDISPATCH}."
+    gh issue comment "$issue_number" --body "BUILD_APPROVED"
+    echo "Redispatched stale Builder issue #${issue_number}."
+  done < <(
+    gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "status:building" \
+      --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
+  )
+}
+
+process_continuous_merge_candidates() {
+  local pull_number
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:ready-to-merge"; then
+      attempt_auto_merge_for_head "$pull_number" "$(pull_request_head_sha "$pull_number")" "watchdog-merge"
+    fi
+  done < <(list_open_factory_pull_requests)
+}
+
+issue_has_label_for_pr() {
+  local pull_number="$1"
+  local label="$2"
+  local issue_number
+
+  mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$pull_number" 2>/dev/null || true)
+  for issue_number in "${linked_issues[@]}"; do
+    if issue_has_label "$issue_number" "$label"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+process_continuous_post_merge_watchdog() {
+  local pull_number merge_sha merged_at
+
+  while IFS= read -r pull_number; do
+    [ -z "$pull_number" ] && continue
+    merged_at="$(gh pr view "$pull_number" --json mergedAt --jq '.mergedAt // empty')"
+    [ -z "$merged_at" ] && continue
+    merge_sha="$(gh pr view "$pull_number" --json mergeCommit --jq '.mergeCommit.oid // empty')"
+    [ -z "$merge_sha" ] && continue
+    if ! is_factory_continuous_loop_pull_request "$pull_number"; then
+      continue
+    fi
+    if issue_has_label_for_pr "$pull_number" "status:completed"; then
+      continue
+    fi
+    handle_post_merge_verification "$pull_number" "$merge_sha" "watchdog-verify"
+  done < <(
+    gh pr list --repo "$GITHUB_REPOSITORY" --state merged --limit 30 --json number,mergedAt \
+      --jq 'sort_by(.mergedAt) | reverse | .[].number' 2>/dev/null || true
+  )
+}
+
+process_continuous_orchestrator_watchdog() {
+  ensure_continuous_orchestrator_labels
+  process_stale_builder_tasks
+  process_continuous_merge_candidates
+  process_continuous_post_merge_watchdog
+  process_deferred_queue
+}
+
+handle_continuous_merge_orchestration() {
+  local pull_number="$1"
+  local head_sha="$2"
+  local source="${3:-review-outcome}"
+  attempt_auto_merge_for_head "$pull_number" "$head_sha" "$source"
+}
+
+handle_continuous_pr_merged_event() {
+  local pull_number="$1"
+  local merge_sha="$2"
+  set_linked_issues_status "$pull_number" "status:merged"
+  handle_post_merge_verification "$pull_number" "$merge_sha" "pr-merged-event"
+}
