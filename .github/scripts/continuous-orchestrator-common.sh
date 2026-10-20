@@ -78,9 +78,9 @@ pull_request_has_ready_to_merge_for_head() {
   local marker
   marker="$(orchestrator_idempotency_marker "review" "$pull_number" "$head_sha")"
 
-  gh pr view "$pull_number" --json comments --jq \
-    --arg marker "$marker" \
-    '[.comments[].body | select(contains($marker) and contains("READY TO MERGE"))] | length > 0' \
+  gh pr view "$pull_number" --json comments \
+    | jq -r --arg marker "$marker" \
+      '[.comments[].body | select(contains($marker) and contains("READY TO MERGE"))] | length > 0' \
     | grep -qx 'true'
 }
 
@@ -133,8 +133,8 @@ pull_request_merge_gate_satisfied() {
     return 1
   fi
 
-  if [ "$checks_state" != "SUCCESS" ] && [ "$checks_state" != "UNKNOWN" ]; then
-    echo "Merge gate: required checks state=${checks_state}."
+  if [ "$checks_state" != "SUCCESS" ]; then
+    echo "Merge gate: required checks state=${checks_state}; only SUCCESS may merge."
     return 1
   fi
 
