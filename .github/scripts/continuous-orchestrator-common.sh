@@ -445,7 +445,34 @@ issue_is_safe_claim_candidate() {
 process_stale_builder_tasks() {
   local now_epoch issue_number updated_at updated_epoch age retry_count
   now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
-  while IFS=
+
+  while IFS=$'\t' read -r issue_number updated_at; do
+    [ -z "$issue_number" ] && continue
+    updated_epoch="$(date -u -d "$updated_at" +%s 2>/dev/null || printf '0')"
+    [ "$updated_epoch" -le 0 ] && continue
+    age="$(( (now_epoch - updated_epoch) / 60 ))"
+    [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && continue
+
+    retry_count="$(gh issue view "$issue_number" --json comments \
+      --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' \
+      2>/dev/null || printf '0')"
+
+    if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
+      gh issue comment "$issue_number" --body "CONTINUOUS_ORCHESTRATOR_STALLED: Builder produced no progress after ${retry_count} redispatch attempts. WAIT_HUMAN."
+      set_issue_status_label "$issue_number" "status:stalled"
+      continue
+    fi
+
+    gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: stale BUILDING detected after ${age} minutes; redispatch attempt $((retry_count + 1))/${CONTINUOUS_BUILDER_MAX_REDISPATCH}."
+    gh issue comment "$issue_number" --body "BUILD_APPROVED"
+    echo "Redispatched stale Builder issue #${issue_number}."
+  done < <(
+    gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "status:building" \
+      --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
+  )
+}
+
+process_continuous_merge_candidates() {
   local pull_number
 
   while IFS= read -r pull_number; do
