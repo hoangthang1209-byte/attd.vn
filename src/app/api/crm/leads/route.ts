@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search") ?? undefined;
   const sourceParam = searchParams.get("source") ?? undefined;
+  const sourceDetail = searchParams.get("sourceDetail")?.trim() || undefined;
   const statusParam = searchParams.get("status") ?? undefined;
   const priorityParam = searchParams.get("priority") ?? undefined;
   const debug = searchParams.get("debug") === "1";
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest) {
     const result = await listCrmLeads({
       search,
       source: sourceParam as LeadSource | undefined,
+      sourceDetail: sourceDetail?.slice(0, 200),
       status: statusParam as LeadStatus | undefined,
       priority: priorityParam as LeadPriority | undefined,
       assignedEmployeeId:
