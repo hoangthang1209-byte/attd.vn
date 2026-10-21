@@ -492,36 +492,79 @@ reconcile_builder_issue() {
   local progress_at progress_epoch age retry_count next_attempt reason
 
   pr_data="$(find_open_pr_for_issue "$issue_number")"
-  pull_number="none"; branch_name="none"; head_sha="none"; is_draft="false"; merge_state="UNKNOWN"; pr_updated_at="$issue_updated_at"
+  pull_number="none"
+  branch_name="none"
+  head_sha="none"
+  is_draft="false"
+  merge_state="UNKNOWN"
+  pr_updated_at="$issue_updated_at"
+
   if [ -n "$pr_data" ]; then
-    IFS=
-  local now_epoch issue_number updated_at updated_epoch age retry_count
+    IFS=$'\t' read -r pull_number branch_name head_sha is_draft merge_state pr_updated_at <<< "$pr_data"
+  fi
+
+  progress_at="$issue_updated_at"
+  if [ -n "$pr_updated_at" ] && [[ "$pr_updated_at" > "$progress_at" ]]; then
+    progress_at="$pr_updated_at"
+  fi
+
+  progress_epoch="$(date -u -d "$progress_at" +%s 2>/dev/null || printf '0')"
+  [ "$progress_epoch" -le 0 ] && return 0
+  age="$(( (now_epoch - progress_epoch) / 60 ))"
+  [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && return 0
+  if builder_lease_is_active "$issue_number"; then
+    return 0
+  fi
+
+  retry_count="$(gh issue view "$issue_number" --json comments \
+    --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' \
+    2>/dev/null || printf '0')"
+
+  if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
+    if ! issue_has_idempotency_marker "$issue_number" "BUILDER_LIVENESS_EXHAUSTED:"; then
+      gh issue comment "$issue_number" --body "BUILDER_LIVENESS_EXHAUSTED: no code/PR progress after $retry_count recovery attempts. CONTINUOUS_ORCHESTRATOR_STALLED: WAIT_HUMAN."
+    fi
+    set_issue_status_label "$issue_number" "status:stalled"
+    return 0
+  fi
+
+  next_attempt="$((retry_count + 1))"
+  reason="stale task for $age minutes"
+  [ "$merge_state" = "DIRTY" ] && reason="merge conflict on PR #$pull_number"
+  [ "$merge_state" = "BEHIND" ] && reason="PR #$pull_number behind main"
+  [ "$is_draft" = "true" ] && reason="draft PR #$pull_number has no recent progress"
+  [ "$pull_number" = "none" ] && reason="no open PR and no recent progress"
+
+  gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: $reason; same-task recovery attempt $next_attempt/$CONTINUOUS_BUILDER_MAX_REDISPATCH. pr=$pull_number branch=$branch_name head=$head_sha. Resume SAME branch/PR, reconcile latest main if behind/conflicted, push code progress, then CI/review."
+  record_builder_lease "$issue_number" "$pull_number" "$head_sha" "$next_attempt"
+  gh issue comment "$issue_number" --body "BUILD_APPROVED"
+  echo "Reconciler redispatched issue #$issue_number (PR $pull_number, head $head_sha, attempt $next_attempt)."
+}
+
+process_stale_builder_tasks() {
+  local now_epoch issue_number updated_at label
+  local -A seen=()
   now_epoch="${CONTINUOUS_NOW_EPOCH:-$(date -u +%s)}"
 
-  while IFS=$'\t' read -r issue_number updated_at; do
-    [ -z "$issue_number" ] && continue
-    updated_epoch="$(date -u -d "$updated_at" +%s 2>/dev/null || printf '0')"
-    [ "$updated_epoch" -le 0 ] && continue
-    age="$(( (now_epoch - updated_epoch) / 60 ))"
-    [ "$age" -lt "$CONTINUOUS_BUILDER_STALE_MINUTES" ] && continue
+  for label in "status:approved" "status:building"; do
+    while IFS=$'\t' read -r issue_number updated_at; do
+      [ -z "$issue_number" ] && continue
+      [ -n "${seen[$issue_number]:-}" ] && continue
+      seen[$issue_number]=1
 
-    retry_count="$(gh issue view "$issue_number" --json comments \
-      --jq '[.comments[].body | select(contains("BUILDER_LIVENESS_REDISPATCH:"))] | length' \
-      2>/dev/null || printf '0')"
+      if issue_excluded_from_active_builder_count "$issue_number"; then
+        continue
+      fi
+      if is_high_risk_issue "$issue_number"; then
+        continue
+      fi
 
-    if [ "$retry_count" -ge "$CONTINUOUS_BUILDER_MAX_REDISPATCH" ]; then
-      gh issue comment "$issue_number" --body "CONTINUOUS_ORCHESTRATOR_STALLED: Builder produced no progress after ${retry_count} redispatch attempts. WAIT_HUMAN."
-      set_issue_status_label "$issue_number" "status:stalled"
-      continue
-    fi
-
-    gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: stale BUILDING detected after ${age} minutes; redispatch attempt $((retry_count + 1))/${CONTINUOUS_BUILDER_MAX_REDISPATCH}."
-    gh issue comment "$issue_number" --body "BUILD_APPROVED"
-    echo "Redispatched stale Builder issue #${issue_number}."
-  done < <(
-    gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "status:building" \
-      --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
-  )
+      reconcile_builder_issue "$issue_number" "$updated_at" "$now_epoch"
+    done < <(
+      gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "$label" \
+        --json number,updatedAt --jq '.[] | [.number, .updatedAt] | @tsv' 2>/dev/null || true
+    )
+  done
 }
 
 process_continuous_merge_candidates() {
