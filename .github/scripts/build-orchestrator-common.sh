@@ -223,8 +223,14 @@ is_high_risk_issue() {
   local issue_number="$1"
   local combined
 
+  # Explicit risk labels are authoritative. A medium/low orchestration task may
+  # legitimately mention protected domains in safety documentation without
+  # becoming a high-risk task itself.
   if issue_has_label "$issue_number" "risk:high"; then
     return 0
+  fi
+  if issue_has_label "$issue_number" "risk:medium" || issue_has_label "$issue_number" "risk:low"; then
+    return 1
   fi
 
   combined="$(issue_body_and_title "$issue_number")"
