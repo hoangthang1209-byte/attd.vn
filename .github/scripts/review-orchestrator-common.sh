@@ -43,21 +43,36 @@ commit_ci_is_green() {
 
 is_factory_pull_request_for_review() {
   local pull_number="$1"
-  local issue_number
+  local issue_number body
+  local -a linked_issues=()
 
   if pull_request_is_draft "$pull_number"; then
+    echo "Review eligibility: PR #${pull_number} is draft." >&2
     return 1
   fi
 
   mapfile -t linked_issues < <(linked_issue_numbers_from_pr "$pull_number" 2>/dev/null || true)
+
   if [ "${#linked_issues[@]}" -eq 0 ]; then
+    body="$(gh pr view "$pull_number" --json body --jq '.body // ""' 2>/dev/null || true)"
+    mapfile -t linked_issues < <(
+      printf '%s\n' "$body"         | grep -Eio '(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+'         | grep -Eo '[0-9]+'         | sort -nu         || true
+    )
+  fi
+
+  if [ "${#linked_issues[@]}" -eq 0 ]; then
+    echo "Review eligibility: PR #${pull_number} has no linked issue after closing-keyword fallback." >&2
     return 1
   fi
 
+  echo "Review eligibility: PR #${pull_number} linked issues: ${linked_issues[*]}." >&2
+
   for issue_number in "${linked_issues[@]}"; do
     if is_high_risk_issue "$issue_number"; then
+      echo "Review eligibility: issue #${issue_number} classified high-risk; blocking auto-review." >&2
       return 1
     fi
+    echo "Review eligibility: issue #${issue_number} accepted for factory review." >&2
   done
 
   return 0
