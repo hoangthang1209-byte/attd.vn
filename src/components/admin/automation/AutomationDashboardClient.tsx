@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { deriveAiCeoExecutiveSummary } from "@/features/automation/ai-ceo-executive-summary";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AutomationAgentRunPanel from "@/components/admin/automation/AutomationAgentRunPanel";
 import AutomationLaneBoard from "@/components/admin/automation/AutomationLaneBoard";
@@ -290,6 +291,14 @@ export default function AutomationDashboardClient() {
   );
 
   const laneBoardData = activeLaneData ?? (view === "active" ? data : null);
+  const executiveSummary = useMemo(() => {
+    if (!laneBoardData?.configured) return null;
+    const quality = laneBoardData.dataCompleteness;
+    return deriveAiCeoExecutiveSummary(laneBoardData.tasks, {
+      date: new Date(laneBoardData.fetchedAt).toISOString().slice(0, 10),
+      incompleteSource: Boolean(quality?.openTasksTruncated || quality?.closedHistoryUnavailable || quality?.historyTruncated || quality?.recognitionDegraded),
+    });
+  }, [laneBoardData]);
   const laneWriteActionConfigured =
     laneBoardData?.writeActionConfigured ?? data?.writeActionConfigured ?? false;
   const laneWriteActionConfigMessage =
@@ -416,6 +425,28 @@ export default function AutomationDashboardClient() {
 
       {data?.configured ? (
         <>
+          {executiveSummary ? (
+            <section aria-label="VNC AI CEO - Tổng quan công việc" className="admin-card" style={{ marginBottom: 20, padding: 20 }}>
+              <h2 className="admin-section-title">VNC AI CEO — Tổng quan công việc</h2>
+              <p className="admin-muted">Tổng hợp task kỹ thuật từ GitHub/Agent OS; chưa bao gồm toàn bộ dữ liệu vận hành thương mại.</p>
+              {executiveSummary.incompleteSource ? <p className="admin-error" role="status">Dữ liệu chưa đầy đủ — các số dưới đây chỉ phản ánh task đã tải.</p> : null}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))", gap: 12 }}>
+                {([
+                  ["Hôm nay", executiveSummary.today],
+                  ["Đang xử lý", executiveSummary.inProgress],
+                  ["Chờ phê duyệt", executiveSummary.needsApproval],
+                  ["Bị chặn", executiveSummary.blocked],
+                  ["Đã hoàn tất", executiveSummary.completed],
+                ] as const).map(([label, value]) => (
+                  <div key={label} style={{ padding: 12, border: "1px solid var(--admin-border, #d8dde2)", borderRadius: 10 }}>
+                    <div className="admin-muted">{label}</div>
+                    <strong style={{ fontSize: 24 }}>{value}</strong>
+                  </div>
+                ))}
+              </div>
+              <p className="admin-muted" style={{ marginTop: 12 }}>Các số phụ thuộc vào chế độ xem hiện tại và tập dữ liệu GitHub đã tải; “Hôm nay” là task cập nhật trong ngày, không phải task hoàn thành. “Chờ phê duyệt” là backlog chưa có BUILD_APPROVED, không phải phê duyệt thương mại.</p>
+            </section>
+          ) : null}
           {laneBoardData ? (
             <>
               {data.dataCompleteness?.closedHistoryUnavailable ? (
