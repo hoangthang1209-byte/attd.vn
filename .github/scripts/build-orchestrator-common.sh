@@ -189,11 +189,12 @@ issue_has_idempotency_marker() {
   local issue_number="$1"
   local marker="$2"
 
-  gh issue view "$issue_number" --json body,comments --jq \
-    --arg marker "$marker" '
-      (.body | contains($marker))
-      or ([.comments[].body | select(contains($marker))] | length > 0)
-    ' | grep -qx 'true'
+  gh issue view "$issue_number" --json body,comments 2>/dev/null \
+    | jq -r --arg marker "$marker" '
+      ((.body // "") | contains($marker))
+      or ([.comments[].body // "" | select(contains($marker))] | length > 0)
+    ' \
+    | grep -qx 'true'
 }
 
 linked_issue_numbers_array() {
@@ -209,8 +210,8 @@ issue_has_label() {
   local issue_number="$1"
   local label="$2"
 
-  gh issue view "$issue_number" --json labels --jq \
-    --arg label "$label" '[.labels[].name | select(. == $label)] | length > 0' \
+  gh issue view "$issue_number" --json labels 2>/dev/null \
+    | jq -r --arg label "$label" '[.labels[].name | select(. == $label)] | length > 0' \
     | grep -qx 'true'
 }
 
