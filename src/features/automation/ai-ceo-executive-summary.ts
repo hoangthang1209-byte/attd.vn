@@ -14,7 +14,8 @@ export type AiCeoExecutiveSummary = {
 
 const ACTIVE = new Set(["approved", "building", "pr_open", "ci_review", "needs_fix", "queued", "ready_to_merge"]);
 const BLOCKED = new Set(["failed", "blocked", "stalled"]);
-const COMPLETED = new Set(["merged", "superseded"]);
+// Superseded means replaced, not successfully completed.
+const COMPLETED = new Set(["merged"]);
 
 /**
  * Derive a truthful, non-mutating CEO overview from the existing Agent OS read model.
