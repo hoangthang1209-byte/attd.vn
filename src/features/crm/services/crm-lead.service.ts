@@ -440,6 +440,7 @@ export async function createAdminLead(
 export type ListCrmLeadsParams = {
   search?: string;
   source?: LeadSource;
+  sourceDetail?: string;
   status?: LeadStatus;
   priority?: LeadPriority;
   assignedEmployeeId?: string;
@@ -486,6 +487,9 @@ export async function listCrmLeads(
       ];
     }
     if (params.source) filters.source = params.source;
+    if (params.sourceDetail?.trim()) {
+      filters.sourceDetail = { equals: params.sourceDetail.trim(), mode: "insensitive" };
+    }
     if (params.status) filters.status = params.status;
     if (params.priority) filters.priority = params.priority;
 
