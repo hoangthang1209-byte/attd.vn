@@ -97,8 +97,23 @@ issue_has_stalled_comment() {
 
 linked_issue_numbers_from_pr() {
   local pull_number="$1"
-  gh pr view "$pull_number" --json closingIssuesReferences --jq \
-    '[.closingIssuesReferences[] | select(.number != null) | .number] | unique | .[]'
+  local pr_json
+
+  pr_json="$(gh pr view "$pull_number" --json closingIssuesReferences,body 2>/dev/null || printf '{"closingIssuesReferences":[],"body":""}')"
+
+  printf '%s' "$pr_json" | jq -r '
+    (
+      [.closingIssuesReferences[]? | select(.number != null) | .number]
+      +
+      [
+        (.body // "")
+        | scan("(?i)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#([0-9]+)")
+        | tonumber
+      ]
+    )
+    | unique
+    | .[]
+  '
 }
 
 reconcile_issue_without_open_pr() {
