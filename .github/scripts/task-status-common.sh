@@ -107,7 +107,8 @@ linked_issue_numbers_from_pr() {
       +
       [
         (.body // "")
-        | scan("(?i)(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#([0-9]+)")
+        | match("(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#([0-9]+)"; "gi")
+        | .captures[0].string
         | tonumber
       ]
     )
