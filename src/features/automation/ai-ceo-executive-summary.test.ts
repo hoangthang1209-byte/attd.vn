@@ -36,3 +36,11 @@ test("does not mutate task input", () => {
   const input = Object.freeze([Object.freeze(mk("ci_review"))]);
   assert.equal(deriveAiCeoExecutiveSummary(input as never, { date: "2026-10-22" }).inProgress, 1);
 });
+
+test("superseded work does not inflate completion KPI", () => {
+  const result = deriveAiCeoExecutiveSummary([
+    mk("superseded", { isOpen: false }), mk("merged", { isOpen: false }),
+  ] as never, { date: "2026-10-22" });
+  assert.equal(result.completed, 1);
+  assert.equal(result.unknown, 1);
+});
