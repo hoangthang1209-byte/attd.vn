@@ -97,24 +97,16 @@ issue_has_stalled_comment() {
 
 linked_issue_numbers_from_pr() {
   local pull_number="$1"
-  local pr_json
+  local closing_refs body
 
-  pr_json="$(gh pr view "$pull_number" --json closingIssuesReferences,body 2>/dev/null || printf '{"closingIssuesReferences":[],"body":""}')"
+  closing_refs="$(gh pr view "$pull_number" --json closingIssuesReferences --jq     '.closingIssuesReferences[]? | select(.number != null) | .number' 2>/dev/null || true)"
 
-  printf '%s' "$pr_json" | jq -r '
-    (
-      [.closingIssuesReferences[]? | select(.number != null) | .number]
-      +
-      [
-        (.body // "")
-        | match("(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#([0-9]+)"; "gi")
-        | .captures[0].string
-        | tonumber
-      ]
-    )
-    | unique
-    | .[]
-  '
+  body="$(gh pr view "$pull_number" --json body --jq '.body // ""' 2>/dev/null || true)"
+
+  {
+    printf '%s\n' "$closing_refs"
+    printf '%s\n' "$body"       | grep -Eio '(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+'       | grep -Eo '[0-9]+'       || true
+  } | awk 'NF' | sort -nu
 }
 
 reconcile_issue_without_open_pr() {
