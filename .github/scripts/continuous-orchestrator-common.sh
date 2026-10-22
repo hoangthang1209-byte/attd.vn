@@ -15,7 +15,7 @@ readonly CONTINUOUS_ORCHESTRATOR_COMPLETED_PREFIX="CONTINUOUS_ORCHESTRATOR_COMPL
 readonly CONTINUOUS_ORCHESTRATOR_STALLED_PREFIX="CONTINUOUS_ORCHESTRATOR_STALLED:"
 readonly CONTINUOUS_ORCHESTRATOR_NEXT_TASK_PREFIX="CONTINUOUS_ORCHESTRATOR_NEXT_TASK_CLAIMED:"
 readonly CONTINUOUS_QUEUE_CLAIM_LABEL="orchestrator:queue-claim"
-readonly AUTOMATION_PRODUCTION_SMOKE_URL="${AUTOMATION_PRODUCTION_SMOKE_URL:-https://attd.vn/}"
+readonly AUTOMATION_PRODUCTION_SMOKE_URL="${AUTOMATION_PRODUCTION_SMOKE_URL:-https://os.vietnamclothing.vn/}"
 CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES="${CONTINUOUS_PRODUCTION_VERIFY_TIMEOUT_MINUTES:-45}"
 CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES="${CONTINUOUS_MAIN_CI_TIMEOUT_MINUTES:-30}"
 CONTINUOUS_SMOKE_TIMEOUT_MINUTES="${CONTINUOUS_SMOKE_TIMEOUT_MINUTES:-20}"
@@ -109,7 +109,10 @@ independent_review_clean_for_merge() {
   review_body="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pull_number}/reviews" --paginate 2>/dev/null \
     | jq -r --arg head "$head_sha" '
       [.[] | select(.commit_id == $head)
-        | select((.body // "") | contains("Independent ATTD PR Review"))][0].body // empty
+        | select((.body // "") | contains("Independent ATTD PR Review"))
+        | {body: (.body // ""), submitted_at: (.submitted_at // "")}]
+      | sort_by(.submitted_at)
+      | last.body // empty
     ')"
 
   if [ -z "$review_body" ]; then
@@ -384,6 +387,7 @@ ${claim_marker}"
     post_orchestrator_build_approved "$issue_number"
   fi
   set_issue_status_label "$issue_number" "status:building"
+  record_builder_lease "$issue_number" "none" "none" "0"
 }
 
 select_next_claimable_agent_os_issue() {
@@ -503,9 +507,16 @@ reconcile_builder_issue() {
     IFS=$'\t' read -r pull_number branch_name head_sha is_draft merge_state pr_updated_at <<< "$pr_data"
   fi
 
-  progress_at="$issue_updated_at"
-  if [ -n "$pr_updated_at" ] && [[ "$pr_updated_at" > "$progress_at" ]]; then
+  # PR activity is the authoritative Builder progress once a PR exists.
+  # Issue updatedAt includes watchdog comments and must not refresh a stale task lease.
+  if [ "$pull_number" != "none" ] && [ -n "$pr_updated_at" ]; then
     progress_at="$pr_updated_at"
+  else
+    progress_at="$(gh issue view "$issue_number" --json comments \
+      | jq -r '[.comments[]
+          | select((.body // "") == "BUILD_APPROVED" or ((.body // "") | startswith("BUILDER_LEASE:")))
+          | (.createdAt // .updatedAt // empty)] | last // empty' 2>/dev/null || true)"
+    [ -z "$progress_at" ] && progress_at="$issue_updated_at"
   fi
 
   progress_epoch="$(date -u -d "$progress_at" +%s 2>/dev/null || printf '0')"
