@@ -11,6 +11,7 @@ ensure_task_status_labels() {
   local labels=(
     "status:approved|0E8A16|Approved for implementation"
     "status:building|1D76DB|Build in progress"
+    "status:ci-review|8250DF|CI green/pending exact-head independent review"
     "status:stalled|D93F0B|Approved but no linked PR within watchdog threshold"
     "status:merging|1B7FCE|Auto-merge in progress for exact PR head"
     "status:verifying|FBCA04|Post-merge production exact-SHA verification"
@@ -30,8 +31,8 @@ ensure_task_status_labels() {
 
 list_issue_status_labels() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json labels --jq \
-    --arg prefix "$STATUS_LABEL_PREFIX" '[.labels[].name | select(startswith($prefix))]'
+  gh issue view "$issue_number" --json labels 2>/dev/null \
+    | jq -r --arg prefix "$STATUS_LABEL_PREFIX" '[.labels[].name | select(startswith($prefix))]'
 }
 
 set_issue_status_label() {
@@ -39,8 +40,8 @@ set_issue_status_label() {
   local target_status="$2"
 
   mapfile -t current_status_labels < <(
-    gh issue view "$issue_number" --json labels --jq \
-      --arg prefix "$STATUS_LABEL_PREFIX" '.labels[].name | select(startswith($prefix))'
+    gh issue view "$issue_number" --json labels 2>/dev/null \
+      | jq -r --arg prefix "$STATUS_LABEL_PREFIX" '.labels[].name | select(startswith($prefix))'
   )
 
   local remove_args=()
@@ -74,25 +75,24 @@ normalize_build_approved_comment() {
 
 latest_authorized_build_approved_timestamp() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json comments,labels --jq \
-    --arg author "$BUILD_APPROVED_AUTHOR" \
-    --arg bot "github-actions[bot]" \
-    '([.labels[].name | select(startswith("orchestrator:"))] | length > 0) as $orchestrator_issue |
-    [.comments[]
-      | select(
-          (.body | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED")
-          and (
-            (.author.login == $author)
-            or ((.author.login == $bot) and $orchestrator_issue)
+  gh issue view "$issue_number" --json comments,labels 2>/dev/null \
+    | jq -r --arg author "$BUILD_APPROVED_AUTHOR" --arg bot "github-actions[bot]" \
+      '([.labels[].name | select(startswith("orchestrator:"))] | length > 0) as $orchestrator_issue |
+      [.comments[]
+        | select(
+            ((.body // "") | gsub("^\\s+|\\s+$"; "") == "BUILD_APPROVED")
+            and (
+              (.author.login == $author)
+              or ((.author.login == $bot) and $orchestrator_issue)
+            )
           )
-        )
-      | .createdAt] | max // empty'
+        | .createdAt] | max // empty'
 }
 
 issue_has_stalled_comment() {
   local issue_number="$1"
-  gh issue view "$issue_number" --json comments --jq \
-    --arg body "$STALLED_COMMENT" '[.comments[] | select(.body == $body)] | length > 0'
+  gh issue view "$issue_number" --json comments 2>/dev/null \
+    | jq -r --arg body "$STALLED_COMMENT" '[.comments[] | select(.body == $body)] | length > 0'
 }
 
 linked_issue_numbers_from_pr() {
