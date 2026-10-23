@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -36,6 +37,23 @@ def api(method: str, path: str, payload: dict | None = None) -> dict:
         raise RuntimeError(f"Cursor API returned HTTP {exc.code} for {method} {path}") from None
 
 
+def validate_launch_issue(issue_number: str) -> None:
+    """Require an explicitly labelled low-risk issue before spending Cursor credits."""
+    if not issue_number.isascii() or not issue_number.isdecimal() or int(issue_number) < 1:
+        raise ValueError("Issue number must be a positive integer")
+    try:
+        completed = subprocess.run(
+            ["gh", "issue", "view", issue_number, "--repo", "hoangthang1209-byte/vnc-os", "--json", "state,labels"],
+            capture_output=True, text=True, check=True, timeout=20,
+        )
+        issue = json.loads(completed.stdout)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
+        raise RuntimeError("Unable to verify GitHub issue approval") from None
+    labels = {entry["name"] for entry in issue.get("labels", [])}
+    if issue.get("state") != "OPEN" or not {"cursor:pilot-approved", "risk:low"}.issubset(labels):
+        raise RuntimeError("Launch denied: issue must be OPEN and labelled cursor:pilot-approved + risk:low")
+
+
 def main() -> None:
     mode = os.environ.get("CURSOR_BRIDGE_MODE", "verify")
     if mode == "verify":
@@ -58,8 +76,7 @@ def main() -> None:
         raise ValueError("Unsupported bridge mode")
 
     issue_number = os.environ.get("CURSOR_ISSUE_NUMBER", "")
-    if not issue_number.isascii() or not issue_number.isdecimal() or int(issue_number) < 1:
-        raise ValueError("Issue number must be a positive integer")
+    validate_launch_issue(issue_number)
     if os.environ.get("CURSOR_LAUNCH_APPROVED") != "true":
         raise RuntimeError("Explicit launch approval required")
 
@@ -92,6 +109,6 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (RuntimeError, ValueError, OSError) as error:
+    except (RuntimeError, ValueError, OSError, json.JSONDecodeError) as error:
         print(f"Cursor bridge error: {error}", file=sys.stderr)
         sys.exit(1)
