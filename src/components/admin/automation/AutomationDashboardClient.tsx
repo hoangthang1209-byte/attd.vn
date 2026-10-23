@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { deriveAiCeoExecutiveSummary } from "@/features/automation/ai-ceo-executive-summary";
+import { deriveLiveBuildMonitor } from "@/features/automation/live-build-monitor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AutomationAgentRunPanel from "@/components/admin/automation/AutomationAgentRunPanel";
 import AutomationLaneBoard from "@/components/admin/automation/AutomationLaneBoard";
@@ -291,6 +292,9 @@ export default function AutomationDashboardClient() {
   );
 
   const laneBoardData = activeLaneData ?? (view === "active" ? data : null);
+  const liveBuildItems = useMemo(() => laneBoardData?.configured
+    ? deriveLiveBuildMonitor(laneBoardData.tasks, Date.parse(laneBoardData.fetchedAt)).slice(0, 15)
+    : [], [laneBoardData]);
   const executiveSummary = useMemo(() => {
     if (!laneBoardData?.configured) return null;
     const quality = laneBoardData.dataCompleteness;
@@ -425,6 +429,30 @@ export default function AutomationDashboardClient() {
 
       {data?.configured ? (
         <>
+          {liveBuildItems.length > 0 ? (
+            <section className="admin-card" aria-label="Live Build Monitor" style={{ padding: 20, marginBottom: 20 }}>
+              <h2 className="admin-section-title">Live Build Monitor</h2>
+              <p className="admin-muted">Dữ liệu GitHub cập nhật khoảng 45 giây khi tab đang mở. Chưa kết nối heartbeat Cursor Builder, nên không khẳng định RUNNING.</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse" }}>
+                  <thead><tr><th>Task</th><th>Trạng thái</th><th>Hoạt động GitHub</th><th>Chi tiết</th></tr></thead>
+                  <tbody>{liveBuildItems.map(item => (
+                    <tr key={item.issueNumber} style={{ borderTop: "1px solid #e5e7eb" }}>
+                      <td style={{ padding: "10px 6px" }}>
+                        <a href={item.prUrl ?? `https://github.com/hoangthang1209-byte/vnc-os/issues/${item.issueNumber}`}
+                          target="_blank" rel="noopener noreferrer">#{item.issueNumber} — {item.title}</a>
+                      </td>
+                      <td style={{ padding: "10px 6px", fontWeight: 600 }}>
+                        {({running:"Đang chạy",waiting:"Đang chờ",stalled:"Nghi đứng",blocked:"Bị chặn",completed:"Hoàn tất",unknown:"Chưa rõ"})[item.status]}
+                      </td>
+                      <td style={{ padding: "10px 6px", whiteSpace:"nowrap" }}>{item.lastActivityAt ? new Date(item.lastActivityAt).toLocaleString("vi-VN") : "Không rõ"}</td>
+                      <td style={{ padding: "10px 6px" }}>{item.reason}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </section>
+          ) : null}
           {executiveSummary ? (
             <section aria-label="VNC AI CEO - Tổng quan công việc" className="admin-card" style={{ marginBottom: 20, padding: 20 }}>
               <h2 className="admin-section-title">VNC AI CEO — Tổng quan công việc</h2>
