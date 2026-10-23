@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test safety gates
-        run: python3 -m unittest discover -s .github/scripts -p 'test-cursor-cloud-api-bridge.py' -v
+        run: python3 .github/scripts/test-cursor-cloud-api-bridge.py -v
       - name: Validate request
         env:
           MODE: ${{ inputs.mode }}
