@@ -535,6 +535,17 @@ reconcile_builder_issue() {
     if ! issue_has_idempotency_marker "$issue_number" "BUILDER_LIVENESS_EXHAUSTED:"; then
       gh issue comment "$issue_number" --body "BUILDER_LIVENESS_EXHAUSTED: no code/PR progress after $retry_count recovery attempts. CONTINUOUS_ORCHESTRATOR_STALLED: WAIT_HUMAN."
     fi
+    # Escalate to the company release tracker once, without flooding the CEO
+    # every watchdog tick. The stalled task remains the source of truth.
+    local escalation_marker="VNC_CEO_BUILDER_STALLED: issue=$issue_number"
+    local escalation_tracker="${VNC_CEO_TRACKER_ISSUE:-231}"
+    if [ "$issue_number" != "$escalation_tracker" ] &&
+       ! gh issue view "$escalation_tracker" --json comments \
+         --jq '.comments[].body' 2>/dev/null | grep -Fq "$escalation_marker"; then
+      gh issue comment "$escalation_tracker" --body "$escalation_marker
+
+Builder task #$issue_number exhausted $retry_count recovery attempts; status:stalled / WAIT_HUMAN. Inspect its linked PR before manual restart. No automatic approval or merge."
+    fi
     set_issue_status_label "$issue_number" "status:stalled"
     return 0
   fi
