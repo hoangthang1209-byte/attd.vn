@@ -36,6 +36,7 @@ concurrency:
 jobs:
   cursor-api-bridge:
     runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
