@@ -12,6 +12,7 @@ import subprocess
 import sys
 import urllib.error
 import urllib.request
+import uuid
 from base64 import b64encode
 
 API_BASE = "https://api.cursor.com/v1"
@@ -65,10 +66,13 @@ def main() -> None:
         if not agent_id.startswith("bc-") or "/" in agent_id:
             raise ValueError("Invalid agent id")
         agent = api("GET", f"/agents/{agent_id}")
+        run_id = agent.get("latestRunId")
+        run = api("GET", f"/agents/{agent_id}/runs/{run_id}") if run_id else {}
         print(json.dumps({
             "id": agent.get("id"),
             "status": agent.get("status"),
-            "latestRunId": agent.get("latestRunId"),
+            "latestRunId": run_id,
+            "latestRunStatus": run.get("status"),
             "url": agent.get("url"),
         }))
         return
@@ -88,7 +92,10 @@ def main() -> None:
         "Open a draft PR; do not merge, deploy, or change protected "
         "business/security domains. If the task is blocked, report why."
     )
+    # Stable identifier refuses duplicate launches for the same approved issue.
+    agent_id = "bc-" + str(uuid.uuid5(uuid.NAMESPACE_URL, REPO + "/issues/" + issue_number))
     result = api("POST", "/agents", {
+        "agentId": agent_id,
         "prompt": {"text": prompt},
         "repos": [{"url": REPO, "startingRef": "main"}],
         "autoCreatePR": True,
