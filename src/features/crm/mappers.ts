@@ -46,6 +46,10 @@ export function mapLeadRow(row: {
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
+  utmTerm?: string | null;
+  utmContent?: string | null;
+  marketingChannel?: string | null;
+  marketingCampaign?: string | null;
   referrer?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -119,6 +123,10 @@ export function mapLeadRow(row: {
     utmSource: row.utmSource ?? null,
     utmMedium: row.utmMedium ?? null,
     utmCampaign: row.utmCampaign ?? null,
+    utmTerm: row.utmTerm ?? null,
+    utmContent: row.utmContent ?? null,
+    marketingChannel: row.marketingChannel ?? null,
+    marketingCampaign: row.marketingCampaign ?? null,
     referrer: row.referrer ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

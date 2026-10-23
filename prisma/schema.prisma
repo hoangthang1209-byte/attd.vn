@@ -292,6 +292,12 @@ model Lead {
   utmSource             String?
   utmMedium             String?
   utmCampaign           String?
+  utmTerm               String?
+  utmContent            String?
+  /// Normalized Growth Engine channel key (see marketing-taxonomy).
+  marketingChannel      String?
+  /// Normalized campaign slug derived from UTM or intake metadata.
+  marketingCampaign     String?
   referrer              String?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
@@ -325,6 +331,8 @@ model Lead {
   @@index([createdAt])
   @@index([followUpAt])
   @@index([nextFollowUpAt])
+  @@index([marketingChannel])
+  @@index([marketingChannel, marketingCampaign])
 }
 
 model LeadTask {

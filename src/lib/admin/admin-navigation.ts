@@ -83,6 +83,18 @@ export const adminNavigationSections: AdminNavigationSection[] = [
     ]),
   },
   {
+    label: "TĂNG TRƯỞNG",
+    icon: "📈",
+    platforms: domainItems([
+      {
+        label: "Growth Engine",
+        href: "/admin/growth/dashboard",
+        status: "active",
+        requiredPermissions: ["canViewDashboard"],
+      },
+    ]),
+  },
+  {
     label: "SẢN PHẨM",
     icon: "📦",
     platforms: domainItems([

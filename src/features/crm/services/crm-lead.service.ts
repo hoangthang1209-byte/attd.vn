@@ -16,6 +16,7 @@ import {
 import { createCRMActivity } from "@/features/crm/services/crm-activity.service";
 import { normalizeLeadEmail, normalizeLeadPhone } from "@/features/crm/lead-identity";
 import { resolveProductInterestSnapshot } from "@/features/crm/services/crm-product-interest-snapshot";
+import { buildPersistedLeadAttribution } from "@/features/growth/lead-attribution-persistence";
 import {
   CRM_LEAD_PRIORITIES,
   CRM_LEAD_SOURCES,
@@ -147,6 +148,19 @@ export async function syncDealerLeadsToCrm(): Promise<number> {
 
     const contactName = dealerLead.contactName;
     const companyName = dealerLead.companyName;
+    const dealerAttribution = buildPersistedLeadAttribution(
+      {
+        source: mapFormSourceToCrmSource(dealerLead.source),
+        utmSource: dealerLead.utmSource,
+        utmMedium: dealerLead.utmMedium,
+        utmCampaign: dealerLead.utmCampaign,
+        utmTerm: dealerLead.utmTerm,
+        utmContent: dealerLead.utmContent,
+        referrer: dealerLead.referrer,
+        landingPage: dealerLead.landingPage,
+      },
+      { intakeChannel: "DEALER_PORTAL" },
+    );
 
     await prisma.lead.upsert({
       where: { id: dealerLead.id },
@@ -165,20 +179,28 @@ export async function syncDealerLeadsToCrm(): Promise<number> {
         followUpAt: dealerLead.contactedAt,
         nextFollowUpAt: dealerLead.contactedAt,
         estimatedValue: dealerLead.estimatedValue,
-        landingPage: dealerLead.landingPage,
-        utmSource: dealerLead.utmSource,
-        utmMedium: dealerLead.utmMedium,
-        utmCampaign: dealerLead.utmCampaign,
-        referrer: dealerLead.referrer,
+        landingPage: dealerAttribution.landingPage,
+        utmSource: dealerAttribution.utmSource,
+        utmMedium: dealerAttribution.utmMedium,
+        utmCampaign: dealerAttribution.utmCampaign,
+        utmTerm: dealerAttribution.utmTerm,
+        utmContent: dealerAttribution.utmContent,
+        referrer: dealerAttribution.referrer,
+        marketingChannel: dealerAttribution.marketingChannel,
+        marketingCampaign: dealerAttribution.marketingCampaign,
         createdAt: dealerLead.createdAt,
         updatedAt: dealerLead.updatedAt,
       },
       update: {
-        landingPage: dealerLead.landingPage,
-        utmSource: dealerLead.utmSource,
-        utmMedium: dealerLead.utmMedium,
-        utmCampaign: dealerLead.utmCampaign,
-        referrer: dealerLead.referrer,
+        landingPage: dealerAttribution.landingPage,
+        utmSource: dealerAttribution.utmSource,
+        utmMedium: dealerAttribution.utmMedium,
+        utmCampaign: dealerAttribution.utmCampaign,
+        utmTerm: dealerAttribution.utmTerm,
+        utmContent: dealerAttribution.utmContent,
+        referrer: dealerAttribution.referrer,
+        marketingChannel: dealerAttribution.marketingChannel,
+        marketingCampaign: dealerAttribution.marketingCampaign,
         estimatedValue: dealerLead.estimatedValue,
       },
     });
@@ -231,6 +253,7 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
 
     const identity = resolveLeadIdentity(input);
     const code = await generateLeadCode();
+    const attribution = buildPersistedLeadAttribution(input, { intakeChannel: "CRM_ADMIN" });
     const interests = [
       ...(input.productInterests ?? []),
       ...(input.productInterest ? [input.productInterest] : []),
@@ -263,11 +286,15 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
             phoneNormalized: normalizeLeadPhone(identity.phone),
             emailNormalized: normalizeLeadEmail(identity.email),
             lastInboundAt: new Date(),
-            landingPage: input.landingPage?.trim() || null,
-            utmSource: input.utmSource?.trim() || null,
-            utmMedium: input.utmMedium?.trim() || null,
-            utmCampaign: input.utmCampaign?.trim() || null,
-            referrer: input.referrer?.trim() || null,
+            landingPage: attribution.landingPage,
+            utmSource: attribution.utmSource,
+            utmMedium: attribution.utmMedium,
+            utmCampaign: attribution.utmCampaign,
+            utmTerm: attribution.utmTerm,
+            utmContent: attribution.utmContent,
+            referrer: attribution.referrer,
+            marketingChannel: attribution.marketingChannel,
+            marketingCampaign: attribution.marketingCampaign,
           },
         });
 
@@ -315,11 +342,15 @@ export async function createCrmLead(input: CreateCrmLeadInput): Promise<CrmLeadR
         nextFollowUpAt: input.nextFollowUpAt ?? input.followUpAt ?? null,
         estimatedValue: input.estimatedValue ?? null,
         assignedTo: input.assignedTo?.trim() || null,
-        landingPage: input.landingPage?.trim() || null,
-        utmSource: input.utmSource?.trim() || null,
-        utmMedium: input.utmMedium?.trim() || null,
-        utmCampaign: input.utmCampaign?.trim() || null,
-        referrer: input.referrer?.trim() || null,
+        landingPage: attribution.landingPage,
+        utmSource: attribution.utmSource,
+        utmMedium: attribution.utmMedium,
+        utmCampaign: attribution.utmCampaign,
+        utmTerm: attribution.utmTerm,
+        utmContent: attribution.utmContent,
+        referrer: attribution.referrer,
+        marketingChannel: attribution.marketingChannel,
+        marketingCampaign: attribution.marketingCampaign,
       },
     });
 

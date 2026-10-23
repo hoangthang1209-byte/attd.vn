@@ -826,6 +826,15 @@ const breadcrumbRules: AdminBreadcrumbRule[] = [
       description: "Phân tích dữ liệu lead, khách hàng và hoạt động chăm sóc.",
     },
   },
+  {
+    path: "/admin/growth/dashboard",
+    meta: {
+      breadcrumbs: ["TĂNG TRƯỞNG", "Growth Engine"],
+      title: "Growth Engine — Doanh thu theo kênh",
+      description:
+        "Lead, báo giá, đơn hàng và doanh thu theo kênh/chiến dịch — không hiển thị vanity metrics.",
+    },
+  },
 
   // ── HỆ THỐNG ───────────────────────────────────────────────
   {

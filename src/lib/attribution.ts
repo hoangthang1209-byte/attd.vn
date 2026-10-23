@@ -106,3 +106,25 @@ export function getAttribution(): AttributionData {
   if (typeof window === "undefined") return {};
   return readStored();
 }
+
+/** Payload for canonical CRM lead intake (`/api/leads`). */
+export function getLeadAttributionPayload(): {
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  referrer: string | null;
+  landingPage: string | null;
+} {
+  const data = getAttribution();
+  return {
+    utmSource: data.utmSource ?? null,
+    utmMedium: data.utmMedium ?? null,
+    utmCampaign: data.utmCampaign ?? null,
+    utmTerm: data.utmTerm ?? null,
+    utmContent: data.utmContent ?? null,
+    referrer: data.referrer ?? null,
+    landingPage: data.landingPage ?? null,
+  };
+}
