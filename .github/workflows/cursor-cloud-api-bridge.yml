@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: cursor-cloud-api-bridge
@@ -45,6 +46,9 @@ jobs:
           AGENT_ID: ${{ inputs.agent_id }}
           APPROVE_LAUNCH: ${{ inputs.approve_launch }}
         run: |
+          if [[ "$MODE" == "status" ]]; then
+            [[ "$AGENT_ID" =~ ^bc-[a-zA-Z0-9-]+$ ]] || { echo "Invalid agent ID"; exit 1; }
+          fi
           if [[ "$MODE" == "launch" ]]; then
             [[ "$APPROVE_LAUNCH" == "true" ]] || { echo "Launch approval missing"; exit 1; }
             [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid issue number"; exit 1; }
@@ -52,6 +56,7 @@ jobs:
       - name: Call Cursor Cloud Agents API
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
           CURSOR_BRIDGE_MODE: ${{ inputs.mode }}
           CURSOR_ISSUE_NUMBER: ${{ inputs.issue_number }}
           CURSOR_AGENT_ID: ${{ inputs.agent_id }}
