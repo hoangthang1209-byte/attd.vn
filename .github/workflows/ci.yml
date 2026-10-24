@@ -97,6 +97,8 @@ jobs:
           done
           bash .github/scripts/review-orchestrator-common.test.sh
           bash .github/scripts/continuous-orchestrator-common.test.sh
+          bash .github/scripts/continuous-cursor-dispatch.test.sh
+          python3 .github/scripts/test-cursor-cloud-api-bridge.py -v
           bash .github/scripts/gh-cli-jq-syntax.test.sh
 
       - name: Tests
