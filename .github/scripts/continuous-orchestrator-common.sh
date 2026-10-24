@@ -512,9 +512,13 @@ reconcile_builder_issue() {
   if [ "$pull_number" != "none" ] && [ -n "$pr_updated_at" ]; then
     progress_at="$pr_updated_at"
   else
+    # A bot-generated BUILD_APPROVED is not proof of actual Builder activity.
+    # Only owner-approved task handoff can seed the initial progress clock.
     progress_at="$(gh issue view "$issue_number" --json comments \
-      | jq -r '[.comments[]
-          | select((.body // "") == "BUILD_APPROVED" or ((.body // "") | startswith("BUILDER_LEASE:")))
+      | jq -r --arg owner "${GITHUB_REPOSITORY_OWNER:-${BUILD_APPROVED_AUTHOR:-}}" \
+        '[.comments[]
+          | select((.body // "") == "BUILD_APPROVED")
+          | select((.author.login // "") == $owner and $owner != "")
           | (.createdAt // .updatedAt // empty)] | last // empty' 2>/dev/null || true)"
     [ -z "$progress_at" ] && progress_at="$issue_updated_at"
   fi
