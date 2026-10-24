@@ -83,7 +83,7 @@ When a repair would start but another task is active:
 - Set the repair issue to `status:queued`
 - The queue workflow retries deferred issues when no active Builder work remains
 
-A historical `ORCHESTRATOR_QUEUE_DEFERRED` comment alone does **not** keep an issue deferred after authorized `BUILD_APPROVED` was posted and the repair was promoted (`status:building`). Only `status:queued` or a defer comment **without** authorized `BUILD_APPROVED` remains eligible for queue reconciliation.
+A deferred repair stays `status:queued` after `BUILD_APPROVED` is posted; an approval comment alone does not prove a Builder is running. Only a verified external Cursor/Builder acknowledgement may advance the task to `status:building`. Existing queued repairs are reconciled without inventing a live worker.
 
 Do not start unrelated feature work while a repair task is active.
 
