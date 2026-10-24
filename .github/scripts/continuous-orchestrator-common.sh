@@ -152,6 +152,11 @@ pull_request_merge_gate_satisfied() {
     return 1
   fi
 
+  if [ "$review_decision" != "APPROVED" ]; then
+    echo "Merge gate: GitHub reviewDecision=${review_decision:-none}; APPROVED required."
+    return 1
+  fi
+
   if [ "$checks_state" != "SUCCESS" ]; then
     echo "Merge gate: required checks state=${checks_state}; only SUCCESS may merge."
     return 1
