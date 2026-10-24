@@ -488,7 +488,8 @@ ${marker}"
   if ! issue_has_orchestrator_build_approved "$repair_issue"; then
     post_orchestrator_build_approved "$repair_issue"
   fi
-  set_issue_status_label "$repair_issue" "status:building"
+  # No verified Cursor run: a bot approval cannot establish BUILDING state.
+  set_issue_status_label "$repair_issue" "status:queued"
   post_unique_pr_comment "$pull_number" "$marker" "$triggered_comment"
 }
 
@@ -717,9 +718,8 @@ process_deferred_queue() {
 
     if issue_has_orchestrator_build_approved "$issue_number"; then
       if issue_has_label "$issue_number" "status:queued"; then
-        echo "Deferred repair issue #${issue_number} has BUILD_APPROVED but status:queued; promoting to status:building."
-        set_issue_status_label "$issue_number" "status:building"
-        return 0
+        echo "Deferred repair issue #${issue_number} awaits a verified external Builder run; keeping status:queued."
+        continue
       fi
       echo "Deferred repair issue #${issue_number} already has BUILD_APPROVED; skipping duplicate trigger."
       continue
@@ -727,7 +727,9 @@ process_deferred_queue() {
 
     echo "Re-triggering deferred repair issue #${issue_number}."
     post_orchestrator_build_approved "$issue_number"
-    set_issue_status_label "$issue_number" "status:building"
+    # Explicit owner-triggered legacy automation may consume this approval, but
+    # do not claim an actual active worker without an API run acknowledgement.
+    set_issue_status_label "$issue_number" "status:queued"
     return 0
   done
 }
