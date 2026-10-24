@@ -4,6 +4,7 @@ import type {
   AgentSummaryCard,
   AgentTaskPriority,
 } from "@/features/agent-os/agent.types";
+import type { AutomationFactoryLoopSnapshot } from "@/features/automation/automation-factory-loop";
 
 export type NormalizedTaskStatus =
   | "backlog"
@@ -17,6 +18,9 @@ export type NormalizedTaskStatus =
   | "failed"
   | "blocked"
   | "queued"
+  | "merging"
+  | "verifying"
+  | "completed"
   | "stalled"
   | "superseded"
   | "unknown";
@@ -106,6 +110,8 @@ export type AutomationTask = {
   agentAssignment: AutomationTaskAgentAssignment;
   taskPriority: AgentTaskPriority;
   parentTaskIssueNumber: number | null;
+  /** Agent OS continuous factory loop (issue #218). */
+  factoryLoop: AutomationFactoryLoopSnapshot;
 };
 
 export type AutomationSummaryMetric = {

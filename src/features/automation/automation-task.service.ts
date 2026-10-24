@@ -27,7 +27,11 @@ import {
 import { getProductionCommitShaFromEnv } from "@/features/automation/automation-production";
 import { enrichTasksWithProductionStatus } from "@/features/automation/automation-production.enrichment";
 import { buildAgentSummaryCards } from "@/features/agent-os/agent-summary";
-import { buildSummary, mapIssueToTask } from "@/features/automation/automation-task.aggregation";
+import {
+  attachFactoryLoopSnapshot,
+  buildSummary,
+  mapIssueToTask,
+} from "@/features/automation/automation-task.aggregation";
 import type {
   AutomationDashboardResponse,
   AutomationDashboardView,
@@ -80,7 +84,7 @@ async function enrichTaskWithLinkedPullRequest(
     verification,
   } as const;
 
-  return {
+  return attachFactoryLoopSnapshot({
     ...task,
     linkedPullRequest: linked,
     mergedAt: resolveMergeTimestamp({
@@ -88,7 +92,7 @@ async function enrichTaskWithLinkedPullRequest(
       closedAt: task.closedAt,
       linkedPullRequestMergedAt: linkedPullRequest.mergedAt,
     }),
-  } satisfies AutomationTask;
+  });
 }
 
 async function loadAutomationTasksUncached(view: AutomationDashboardView): Promise<CachedAutomationPayload> {

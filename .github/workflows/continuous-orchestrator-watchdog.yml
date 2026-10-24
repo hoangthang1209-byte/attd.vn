@@ -1,0 +1,34 @@
+name: Continuous Orchestrator — Watchdog
+
+on:
+  schedule:
+    - cron: "*/8 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: continuous-orchestrator-watchdog
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  advance-factory-loop:
+    name: Merge, verify production, claim next task
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run continuous orchestrator watchdog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          BUILD_APPROVED_AUTHOR: ${{ github.repository_owner }}
+        run: |
+          source .github/scripts/continuous-orchestrator-common.sh
+          process_continuous_orchestrator_watchdog

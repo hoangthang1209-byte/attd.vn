@@ -189,11 +189,12 @@ issue_has_idempotency_marker() {
   local issue_number="$1"
   local marker="$2"
 
-  gh issue view "$issue_number" --json body,comments --jq \
-    --arg marker "$marker" '
-      (.body | contains($marker))
-      or ([.comments[].body | select(contains($marker))] | length > 0)
-    ' | grep -qx 'true'
+  gh issue view "$issue_number" --json body,comments 2>/dev/null \
+    | jq -r --arg marker "$marker" '
+      ((.body // "") | contains($marker))
+      or ([.comments[].body // "" | select(contains($marker))] | length > 0)
+    ' \
+    | grep -qx 'true'
 }
 
 linked_issue_numbers_array() {
@@ -209,8 +210,8 @@ issue_has_label() {
   local issue_number="$1"
   local label="$2"
 
-  gh issue view "$issue_number" --json labels --jq \
-    --arg label "$label" '[.labels[].name | select(. == $label)] | length > 0' \
+  gh issue view "$issue_number" --json labels 2>/dev/null \
+    | jq -r --arg label "$label" '[.labels[].name | select(. == $label)] | length > 0' \
     | grep -qx 'true'
 }
 
@@ -223,8 +224,14 @@ is_high_risk_issue() {
   local issue_number="$1"
   local combined
 
+  # Explicit risk labels are authoritative. A medium/low orchestration task may
+  # legitimately mention protected domains in safety documentation without
+  # becoming a high-risk task itself.
   if issue_has_label "$issue_number" "risk:high"; then
     return 0
+  fi
+  if issue_has_label "$issue_number" "risk:medium" || issue_has_label "$issue_number" "risk:low"; then
+    return 1
   fi
 
   combined="$(issue_body_and_title "$issue_number")"
@@ -264,7 +271,7 @@ is_low_risk_pull_request() {
     fi
 
     if issue_has_label "$issue_number" "risk:medium"; then
-      return 1
+      continue
     fi
 
     return 1
@@ -481,7 +488,8 @@ ${marker}"
   if ! issue_has_orchestrator_build_approved "$repair_issue"; then
     post_orchestrator_build_approved "$repair_issue"
   fi
-  set_issue_status_label "$repair_issue" "status:building"
+  # No verified Cursor run: a bot approval cannot establish BUILDING state.
+  set_issue_status_label "$repair_issue" "status:queued"
   post_unique_pr_comment "$pull_number" "$marker" "$triggered_comment"
 }
 
@@ -710,9 +718,8 @@ process_deferred_queue() {
 
     if issue_has_orchestrator_build_approved "$issue_number"; then
       if issue_has_label "$issue_number" "status:queued"; then
-        echo "Deferred repair issue #${issue_number} has BUILD_APPROVED but status:queued; promoting to status:building."
-        set_issue_status_label "$issue_number" "status:building"
-        return 0
+        echo "Deferred repair issue #${issue_number} awaits a verified external Builder run; keeping status:queued."
+        continue
       fi
       echo "Deferred repair issue #${issue_number} already has BUILD_APPROVED; skipping duplicate trigger."
       continue
@@ -720,7 +727,9 @@ process_deferred_queue() {
 
     echo "Re-triggering deferred repair issue #${issue_number}."
     post_orchestrator_build_approved "$issue_number"
-    set_issue_status_label "$issue_number" "status:building"
+    # Explicit owner-triggered legacy automation may consume this approval, but
+    # do not claim an actual active worker without an API run acknowledgement.
+    set_issue_status_label "$issue_number" "status:queued"
     return 0
   done
 }

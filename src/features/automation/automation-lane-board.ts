@@ -60,10 +60,13 @@ const OPEN_TASK_SELECTION_PRIORITY: Record<NormalizedTaskStatus, number> = {
   ci_review: 3,
   queued: 3,
   ready_to_merge: 3,
+  merging: 3,
+  verifying: 3,
   backlog: 4,
   approved: 4,
   unknown: 4,
   merged: 99,
+  completed: 99,
   superseded: 99,
 };
 

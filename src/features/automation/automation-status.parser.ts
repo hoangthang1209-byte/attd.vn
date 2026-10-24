@@ -24,6 +24,9 @@ export const AUTOMATION_STATUS_GITHUB_LABELS = [
   "status:stalled",
   "status:superseded",
   "status:queued",
+  "status:merging",
+  "status:verifying",
+  "status:completed",
 ] as const;
 
 const STATUS_LABEL_TO_NORMALIZED: Record<string, NormalizedTaskStatus> = {
@@ -42,6 +45,9 @@ const STATUS_LABEL_TO_NORMALIZED: Record<string, NormalizedTaskStatus> = {
   "status:stalled": "stalled",
   "status:superseded": "superseded",
   "status:queued": "queued",
+  "status:merging": "merging",
+  "status:verifying": "verifying",
+  "status:completed": "completed",
 };
 
 const RISK_LABEL_TO_NORMALIZED: Record<string, AutomationTaskRisk> = {
@@ -57,6 +63,8 @@ const BLOCKER_COMMENT_PREFIXES = [
   "ORCHESTRATOR_REPAIR_TRIGGERED:",
   "ORCHESTRATOR_CI_REPAIR_TRIGGERED:",
   "REVIEW_ORCHESTRATOR_STALLED:",
+  "CONTINUOUS_ORCHESTRATOR_STALLED:",
+  "CONTINUOUS_ORCHESTRATOR_MERGE_FAILED:",
   "READY TO MERGE",
 ] as const;
 
