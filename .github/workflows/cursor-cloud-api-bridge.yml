@@ -1,0 +1,67 @@
+name: Cursor Cloud API Bridge — Controlled Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "verify key, check agent status, or explicitly launch approved issue"
+        required: true
+        type: choice
+        options:
+          - verify
+          - status
+          - launch
+      issue_number:
+        description: "Issue number for launch; not used by verify/status"
+        required: false
+        type: string
+      agent_id:
+        description: "Existing Cursor Cloud Agent ID for status"
+        required: false
+        type: string
+      approve_launch:
+        description: "Confirm dispatch of one new cloud coding agent; launch may incur Cursor costs"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: cursor-cloud-api-bridge
+  cancel-in-progress: false
+
+jobs:
+  cursor-api-bridge:
+    runs-on: ubuntu-latest
+    if: github.actor == github.repository_owner
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test safety gates
+        run: python3 .github/scripts/test-cursor-cloud-api-bridge.py -v
+      - name: Validate request
+        env:
+          MODE: ${{ inputs.mode }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          AGENT_ID: ${{ inputs.agent_id }}
+          APPROVE_LAUNCH: ${{ inputs.approve_launch }}
+        run: |
+          if [[ "$MODE" == "status" ]]; then
+            [[ "$AGENT_ID" =~ ^bc-[a-zA-Z0-9-]+$ ]] || { echo "Invalid agent ID"; exit 1; }
+          fi
+          if [[ "$MODE" == "launch" ]]; then
+            [[ "$APPROVE_LAUNCH" == "true" ]] || { echo "Launch approval missing"; exit 1; }
+            [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid issue number"; exit 1; }
+          fi
+      - name: Call Cursor Cloud Agents API
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          CURSOR_BRIDGE_MODE: ${{ inputs.mode }}
+          CURSOR_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          CURSOR_AGENT_ID: ${{ inputs.agent_id }}
+          CURSOR_LAUNCH_APPROVED: ${{ inputs.approve_launch }}
+        run: python3 .github/scripts/cursor-cloud-api-bridge.py
