@@ -418,7 +418,7 @@ select_next_claimable_agent_os_issue() {
   done < <(
     printf '%s' "$issue_json" | jq -r '
       [.[] 
-        | select([.labels[].name] | any(. == "risk:low" or . == "risk:medium"))
+        | select([.labels[].name] | index("risk:low") != null and index("cursor:pilot-approved") != null)
         | select([.labels[].name] | all(. != "orchestrator:review-repair" and . != "orchestrator:ci-repair"))
         | select([.labels[].name] | all(. != "status:building" and . != "status:pr-open" and . != "status:completed"))
       ] | sort_by(.number) | .[].number
