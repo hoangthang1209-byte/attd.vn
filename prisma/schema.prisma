@@ -6511,3 +6511,18 @@ model AgentDecision {
 
   @@index([agentRunId, createdAt])
 }
+
+/// VNC leadership identities; provisioned names are not proof of running agents.
+model VncAiManager {
+  id             String   @id
+  name           String
+  role           String
+  department     String
+  reportsToId    String?
+  runtimeEnabled Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  reportsTo      VncAiManager?  @relation("VncAiManagerHierarchy", fields: [reportsToId], references: [id], onDelete: Restrict)
+  reports        VncAiManager[] @relation("VncAiManagerHierarchy")
+}
