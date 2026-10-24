@@ -46,6 +46,10 @@ class BridgeTests(unittest.TestCase):
             ("OPEN", ["risk:low"], False),
             ("OPEN", ["cursor:pilot-approved"], False),
             ("OPEN", ["cursor:pilot-approved", "risk:high"], False),
+            ("OPEN", ["cursor:pilot-approved-medium", "risk:medium"], True),
+            ("OPEN", ["cursor:pilot-approved", "risk:medium"], False),
+            ("OPEN", ["cursor:pilot-approved-medium", "risk:high"], False),
+            ("OPEN", ["cursor:pilot-approved", "risk:low", "risk:high"], False),
         ]:
             run.return_value = CompletedProcess([], 0, json.dumps({
                 "state": state, "labels": [{"name": name} for name in labels]
