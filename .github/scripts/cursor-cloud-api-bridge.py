@@ -51,8 +51,11 @@ def validate_launch_issue(issue_number: str) -> None:
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         raise RuntimeError("Unable to verify GitHub issue approval") from None
     labels = {entry["name"] for entry in issue.get("labels", [])}
-    if issue.get("state") != "OPEN" or not {"cursor:pilot-approved", "risk:low"}.issubset(labels):
-        raise RuntimeError("Launch denied: issue must be OPEN and labelled cursor:pilot-approved + risk:low")
+    approved_low = {"cursor:pilot-approved", "risk:low"}.issubset(labels)
+    approved_medium = {"cursor:pilot-approved-medium", "risk:medium"}.issubset(labels)
+    forbidden = bool(labels & {"risk:high", "risk:critical"})
+    if issue.get("state") != "OPEN" or forbidden or not (approved_low or approved_medium):
+        raise RuntimeError("Launch denied: require OPEN approved low/medium-risk issue; high-risk denied")
 
 
 def main() -> None:
