@@ -16,6 +16,7 @@ MOCK_PR_HEAD="merge-head-sha"
 MOCK_MERGEABLE="MERGEABLE"
 MOCK_MERGE_STATE="CLEAN"
 MOCK_CHECKS="SUCCESS"
+MOCK_REVIEW_DECISION="APPROVED"
 MOCK_CI_GREEN=1
 MOCK_REVIEW_CLEAN=1
 MOCK_READY_TO_MERGE=1
@@ -30,7 +31,7 @@ commit_ci_is_green() { [ "${MOCK_CI_GREEN:-1}" -eq 1 ]; }
 independent_review_clean_for_merge() { [ "${MOCK_REVIEW_CLEAN:-1}" -eq 1 ]; }
 pull_request_has_ready_to_merge_for_head() { [ "${MOCK_READY_TO_MERGE:-1}" -eq 1 ]; }
 pull_request_merge_state() {
-  printf '%s\t%s\tAPPROVED\t%s' "$MOCK_MERGEABLE" "$MOCK_MERGE_STATE" "$MOCK_CHECKS"
+  printf '%s\t%s\t%s\t%s' "$MOCK_MERGEABLE" "$MOCK_MERGE_STATE" "$MOCK_REVIEW_DECISION" "$MOCK_CHECKS"
 }
 pr_has_marker_comment() { return 1; }
 post_continuous_pr_comment() { MOCK_PR_COMMENT_COUNT=$((MOCK_PR_COMMENT_COUNT + 1)); }
@@ -82,6 +83,24 @@ if [ "$MOCK_MERGE_API_CALLS" -eq 0 ]; then
   pass "missing clean exact-head review blocks merge"
 else
   fail "missing clean exact-head review blocks merge"
+fi
+
+reset
+MOCK_REVIEW_DECISION="CHANGES_REQUESTED"
+attempt_auto_merge_for_head 42 "merge-head-sha" "test"
+if [ "$MOCK_MERGE_API_CALLS" -eq 0 ]; then
+  pass "CHANGES_REQUESTED blocks autonomous merge"
+else
+  fail "CHANGES_REQUESTED blocks autonomous merge"
+fi
+
+reset
+MOCK_REVIEW_DECISION="REVIEW_REQUIRED"
+attempt_auto_merge_for_head 42 "merge-head-sha" "test"
+if [ "$MOCK_MERGE_API_CALLS" -eq 0 ]; then
+  pass "missing required GitHub approval blocks autonomous merge"
+else
+  fail "missing required GitHub approval blocks autonomous merge"
 fi
 
 if [ "$fail" -gt 0 ]; then
