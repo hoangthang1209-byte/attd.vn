@@ -290,24 +290,42 @@ export async function retryAgentRun(input: {
     throw new Error("Retry requires a failed or cancelled terminal run");
   }
 
+  return createFollowUpAgentRunAttempt({
+    previousRunId: failed.id,
+    triggerSource: input.triggerSource,
+    idempotencyKey: input.idempotencyKey,
+  });
+}
+
+/** New AgentRun row after any terminal attempt (including SUCCEEDED resume). */
+export async function createFollowUpAgentRunAttempt(input: {
+  previousRunId: string;
+  triggerSource: AgentEventSource;
+  idempotencyKey: string;
+}) {
+  const previous = await prisma.agentRun.findUniqueOrThrow({ where: { id: input.previousRunId } });
+  if (!isTerminalAgentRunStatus(previous.status)) {
+    throw new Error("Follow-up attempt requires a terminal run");
+  }
+
   const existing = await prisma.agentRun.findUnique({
     where: { idempotencyKey: input.idempotencyKey },
   });
   if (existing) return existing;
 
-  const correlationId = failed.correlationId ?? failed.id;
-  const nextAttempt = failed.attemptNumber + 1;
+  const correlationId = previous.correlationId ?? previous.id;
+  const nextAttempt = previous.attemptNumber + 1;
 
   return createAgentRun({
-    agentId: failed.agentId,
+    agentId: previous.agentId,
     triggerSource: input.triggerSource,
-    githubIssueNumber: failed.githubIssueNumber,
+    githubIssueNumber: previous.githubIssueNumber,
     correlationId,
-    parentRunId: failed.id,
+    parentRunId: previous.id,
     idempotencyKey: input.idempotencyKey,
     attemptNumber: nextAttempt,
-    inputSummary: (failed.inputSummary as AgentRunSummaryJson | null) ?? undefined,
-    humanApprovalRequired: failed.humanApprovalRequired,
+    inputSummary: (previous.inputSummary as AgentRunSummaryJson | null) ?? undefined,
+    humanApprovalRequired: previous.humanApprovalRequired,
   });
 }
 
