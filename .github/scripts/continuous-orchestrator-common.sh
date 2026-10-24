@@ -418,7 +418,7 @@ select_next_claimable_agent_os_issue() {
   done < <(
     printf '%s' "$issue_json" | jq -r '
       [.[] 
-        | select([.labels[].name] | ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
+        | select([.labels[].name] | (index("risk:high") == null and index("risk:critical") == null) and ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
         | select([.labels[].name] | all(. != "orchestrator:review-repair" and . != "orchestrator:ci-repair"))
         | select([.labels[].name] | all(. != "status:building" and . != "status:pr-open" and . != "status:completed"))
       ] | sort_by(.number) | .[].number
@@ -503,7 +503,7 @@ dispatch_approved_cursor_issue() {
     .state == "OPEN" and
     ([.labels[].name] | ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
   ' >/dev/null; then
-    echo "Issue #$issue_number lacks explicit low-risk Cursor dispatch approval."
+    echo "Issue #$issue_number lacks explicit low/medium Cursor dispatch approval or has a high-risk label."
     return 1
   fi
   if issue_has_idempotency_marker "$issue_number" "CURSOR_API_AGENT_ID:"; then
