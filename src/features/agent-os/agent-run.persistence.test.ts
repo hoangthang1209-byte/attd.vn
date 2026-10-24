@@ -4,6 +4,7 @@ import { ingestGitHubIssueStatusEvent } from "@/features/agent-os/agent-event.in
 import {
   applyInboundAgentEvent,
   createAgentRun,
+  createAgentRunAfterTerminal,
   retryAgentRun,
 } from "@/features/agent-os/agent-run.service";
 import { prisma } from "@/lib/prisma";
@@ -106,5 +107,28 @@ describe("agent run persistence", () => {
     assert.equal(retried.attemptNumber, failed.attemptNumber + 1);
     assert.equal(retried.parentRunId, failed.id);
     assert.equal(retried.status, "QUEUED");
+  });
+
+  it("createAgentRunAfterTerminal allows a new attempt after SUCCEEDED", async () => {
+    const succeeded = await createAgentRun({
+      agentId: "ATTD_CTO",
+      triggerSource: "GITHUB_ISSUE_STATUS",
+      githubIssueNumber: TEST_ISSUE,
+      idempotencyKey: `test-run:${TEST_ISSUE}:succeeded`,
+    });
+
+    await prisma.agentRun.update({
+      where: { id: succeeded.id },
+      data: { status: "SUCCEEDED", finishedAt: new Date() },
+    });
+
+    const next = await createAgentRunAfterTerminal({
+      priorRunId: succeeded.id,
+      triggerSource: "GITHUB_ISSUE_STATUS",
+      idempotencyKey: `test-run:${TEST_ISSUE}:after-success`,
+    });
+
+    assert.equal(next.attemptNumber, succeeded.attemptNumber + 1);
+    assert.equal(next.parentRunId, succeeded.id);
   });
 });
