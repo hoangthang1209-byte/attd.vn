@@ -559,8 +559,10 @@ Builder task #$issue_number exhausted $retry_count recovery attempts; status:sta
 
   gh issue comment "$issue_number" --body "BUILDER_LIVENESS_REDISPATCH: $reason; same-task recovery attempt $next_attempt/$CONTINUOUS_BUILDER_MAX_REDISPATCH. pr=$pull_number branch=$branch_name head=$head_sha. Resume SAME branch/PR, reconcile latest main if behind/conflicted, push code progress, then CI/review."
   record_builder_lease "$issue_number" "$pull_number" "$head_sha" "$next_attempt"
-  gh issue comment "$issue_number" --body "BUILD_APPROVED"
-  echo "Reconciler redispatched issue #$issue_number (PR $pull_number, head $head_sha, attempt $next_attempt)."
+  # GitHub Actions bot comments do not authorize or actually launch the external Cursor Builder.
+  # Never claim success or refresh a Builder lease based on a synthetic BUILD_APPROVED.
+  gh issue comment "$issue_number" --body "CURSOR_DISPATCH_REQUIRED: Owner-authorized Cursor Cloud API dispatch is required for this stale task. Existing PR=$pull_number, head=$head_sha. Do not create a second agent or pretend Builder resumed."
+  echo "Reconciler flagged issue #$issue_number for real Cursor API dispatch (attempt $next_attempt); no Builder run claimed."
 }
 
 process_stale_builder_tasks() {
