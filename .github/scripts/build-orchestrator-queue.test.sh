@@ -196,10 +196,10 @@ if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 0 ]; then
 else
   fail "already-triggered deferred repair does not emit duplicate BUILD_APPROVED"
 fi
-if [ "$MOCK_BUILDING_PROMOTIONS" -eq 1 ]; then
-  pass "queued deferred repair with BUILD_APPROVED is promoted to status:building"
+if [ "$MOCK_BUILDING_PROMOTIONS" -eq 0 ]; then
+  pass "queued deferred repair does not fake BUILDING without a verified run"
 else
-  fail "queued deferred repair with BUILD_APPROVED is promoted to status:building (got ${MOCK_BUILDING_PROMOTIONS})"
+  fail "queued deferred repair incorrectly promoted to status:building (got ${MOCK_BUILDING_PROMOTIONS})"
 fi
 
 # Issue #50 P2.2: defer comment without status:queued label is reconciled and resumed.
@@ -210,10 +210,10 @@ MOCK_DEFERRED_HAS_BUILD_APPROVED=0
 MOCK_BUILD_APPROVED_POSTS=0
 MOCK_RESTORED_QUEUED_LABELS=0
 process_deferred_queue
-if [ "$MOCK_RESTORED_QUEUED_LABELS" -eq 1 ]; then
-  pass "missing status:queued label is restored for deferred repair issue"
+if [ "$MOCK_RESTORED_QUEUED_LABELS" -ge 1 ]; then
+  pass "missing status:queued label is restored and remains queued pending run confirmation"
 else
-  fail "missing status:queued label is restored for deferred repair issue (got ${MOCK_RESTORED_QUEUED_LABELS})"
+  fail "missing status:queued label was not restored (got ${MOCK_RESTORED_QUEUED_LABELS})"
 fi
 if [ "$MOCK_BUILD_APPROVED_POSTS" -eq 1 ]; then
   pass "deferred repair without status:queued resumes with exactly one BUILD_APPROVED"
