@@ -504,7 +504,7 @@ dispatch_approved_cursor_issue() {
   issue_json="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state,labels 2>/dev/null)" || return 1
   if ! printf '%s' "$issue_json" | jq -e '
     .state == "OPEN" and
-    ([.labels[].name] | ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
+    ([.labels[].name] | index("risk:high") == null and index("risk:critical") == null and ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
   ' >/dev/null; then
     echo "Issue #$issue_number lacks explicit low/medium Cursor dispatch approval or has a high-risk label."
     return 1
