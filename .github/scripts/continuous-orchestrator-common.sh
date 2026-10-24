@@ -387,6 +387,11 @@ ${claim_marker}"
   # before the issue is marked building or a Builder lease is recorded.
   gh issue comment "$issue_number" --body "CURSOR_QUEUE_RESERVED: waiting for eligible, explicitly authorised Cursor API dispatch."
   set_issue_status_label "$issue_number" "status:approved"
+  # Dispatch immediately only when the owner has separately approved the
+  # issue with cursor:pilot-approved + risk:low. Other tasks stay queued.
+  if ! dispatch_approved_cursor_issue "$issue_number"; then
+    echo "Issue #$issue_number reserved but not Cursor-dispatch eligible."
+  fi
 }
 
 select_next_claimable_agent_os_issue() {
