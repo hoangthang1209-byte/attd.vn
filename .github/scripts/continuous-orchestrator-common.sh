@@ -418,7 +418,7 @@ select_next_claimable_agent_os_issue() {
   done < <(
     printf '%s' "$issue_json" | jq -r '
       [.[] 
-        | select([.labels[].name] | index("risk:low") != null and index("cursor:pilot-approved") != null)
+        | select([.labels[].name] | ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
         | select([.labels[].name] | all(. != "orchestrator:review-repair" and . != "orchestrator:ci-repair"))
         | select([.labels[].name] | all(. != "status:building" and . != "status:pr-open" and . != "status:completed"))
       ] | sort_by(.number) | .[].number
@@ -501,7 +501,7 @@ dispatch_approved_cursor_issue() {
   issue_json="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state,labels 2>/dev/null)" || return 1
   if ! printf '%s' "$issue_json" | jq -e '
     .state == "OPEN" and
-    ([.labels[].name] | index("risk:low") != null and index("cursor:pilot-approved") != null)
+    ([.labels[].name] | ((index("risk:low") != null and index("cursor:pilot-approved") != null) or (index("risk:medium") != null and index("cursor:pilot-approved-medium") != null)))
   ' >/dev/null; then
     echo "Issue #$issue_number lacks explicit low-risk Cursor dispatch approval."
     return 1
