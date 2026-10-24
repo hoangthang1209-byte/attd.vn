@@ -383,11 +383,10 @@ claim_next_eligible_agent_os_task() {
 
 ${claim_marker}"
 
-  if ! issue_has_orchestrator_build_approved "$issue_number"; then
-    post_orchestrator_build_approved "$issue_number"
-  fi
-  set_issue_status_label "$issue_number" "status:building"
-  record_builder_lease "$issue_number" "none" "none" "0"
+  # Claim is a queue reservation only. The Cursor API must return a real run
+  # before the issue is marked building or a Builder lease is recorded.
+  gh issue comment "$issue_number" --body "CURSOR_QUEUE_RESERVED: waiting for eligible, explicitly authorised Cursor API dispatch."
+  set_issue_status_label "$issue_number" "status:approved"
 }
 
 select_next_claimable_agent_os_issue() {
@@ -488,6 +487,34 @@ builder_lease_is_active() {
   [ "$expiry_epoch" -gt "$now_epoch" ]
 }
 
+# The only automatic launch path: an explicitly approved LOW-risk task.
+# Deterministic Agent IDs in the shared bridge make duplicate launch fail closed.
+dispatch_approved_cursor_issue() {
+  local issue_number="$1"
+  local issue_json result agent_id run_id
+  [ -n "${CURSOR_API_KEY:-}" ] || { echo "Cursor API secret unavailable; dispatch skipped."; return 1; }
+  issue_json="$(gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state,labels 2>/dev/null)" || return 1
+  if ! printf '%s' "$issue_json" | jq -e '
+    .state == "OPEN" and
+    ([.labels[].name] | index("risk:low") != null and index("cursor:pilot-approved") != null)
+  ' >/dev/null; then
+    echo "Issue #$issue_number lacks explicit low-risk Cursor dispatch approval."
+    return 1
+  fi
+  if issue_has_idempotency_marker "$issue_number" "CURSOR_API_AGENT_ID:"; then
+    echo "Issue #$issue_number already dispatched; refusing a second launch."
+    return 0
+  fi
+  result="$(CURSOR_BRIDGE_MODE=launch CURSOR_ISSUE_NUMBER="$issue_number" CURSOR_LAUNCH_APPROVED=true python3 .github/scripts/cursor-cloud-api-bridge.py)" || return 1
+  agent_id="$(printf '%s' "$result" | jq -er '.agentId')"
+  run_id="$(printf '%s' "$result" | jq -er '.runId')"
+  gh issue comment "$issue_number" --body "CURSOR_API_AGENT_ID: $agent_id
+CURSOR_API_RUN_ID: $run_id
+CURSOR_API_LAUNCH_CONFIRMED: real Cursor API response; task #$issue_number."
+  set_issue_status_label "$issue_number" "status:building"
+  record_builder_lease "$issue_number" "none" "none" "0"
+}
+
 reconcile_builder_issue() {
   local issue_number="$1"
   local issue_updated_at="$2"
@@ -565,7 +592,13 @@ Builder task #$issue_number exhausted $retry_count recovery attempts; status:sta
   # Do not record a lease before a real Cursor run has been created.
   # GitHub Actions bot comments do not authorize or actually launch the external Cursor Builder.
   # Never claim success or refresh a Builder lease based on a synthetic BUILD_APPROVED.
-  gh issue comment "$issue_number" --body "CURSOR_DISPATCH_REQUIRED: Owner-authorized Cursor Cloud API dispatch is required for this stale task. Existing PR=$pull_number, head=$head_sha. Do not create a second agent or pretend Builder resumed."
+  if [ "$pull_number" = "none" ] && ! issue_has_idempotency_marker "$issue_number" "CURSOR_API_AGENT_ID:"; then
+    if dispatch_approved_cursor_issue "$issue_number"; then
+      echo "Cursor dispatch completed or reconciled for task #$issue_number."
+      return 0
+    fi
+  fi
+  gh issue comment "$issue_number" --body "CURSOR_DISPATCH_REQUIRED: No safe automatic recovery for this task. Existing PR=$pull_number, head=$head_sha. Review existing Cursor agent/run before re-dispatch; no duplicate agent created."
   echo "Reconciler flagged issue #$issue_number for real Cursor API dispatch (attempt $next_attempt); no Builder run claimed."
 }
 
