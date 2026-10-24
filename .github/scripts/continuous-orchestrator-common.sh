@@ -61,7 +61,10 @@ is_factory_continuous_loop_pull_request() {
     if is_high_risk_issue "$issue_number"; then
       return 1
     fi
-    if issue_has_label "$issue_number" "risk:low" || issue_has_label "$issue_number" "risk:medium"; then
+    if issue_has_label "$issue_number" "risk:low" && issue_has_label "$issue_number" "cursor:pilot-approved"; then
+      continue
+    fi
+    if issue_has_label "$issue_number" "risk:medium" && issue_has_label "$issue_number" "cursor:pilot-approved-medium"; then
       continue
     fi
     return 1
